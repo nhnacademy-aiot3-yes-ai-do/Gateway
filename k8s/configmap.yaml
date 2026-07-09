@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+data:
+  EUREKA_ENABLED: "false"
+  K8S_DISCOVERY_ENABLED: "true"
