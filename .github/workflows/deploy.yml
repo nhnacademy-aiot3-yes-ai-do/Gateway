@@ -10,12 +10,16 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_name: ${{ steps.image.outputs.name }}
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
+      - name: 이미지 이름 소문자로 변환
+        id: image
+        run: echo "name=$(echo ghcr.io/${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -29,8 +33,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
 
   deploy:
     needs: build-and-push
@@ -46,7 +50,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "k8s/*"
-          target: "/tmp/gateway-k8s"
+          target: "~/infra/gateway-k8s"
 
       - name: Apply manifests and roll out new image
         uses: appleboy/ssh-action@v1
@@ -57,6 +61,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             export PATH=$HOME/bin:$PATH
-            kubectl apply -f /tmp/gateway-k8s/
-            kubectl set image deployment/gateway-service gateway-service=${{ env.IMAGE_NAME }}:${{ github.sha }}
+            kubectl apply -f ~/infra/gateway-k8s/
+            kubectl set image deployment/gateway-service gateway-service=${{ needs.build-and-push.outputs.image_name }}:${{ github.sha }}
             kubectl rollout status deployment/gateway-service --timeout=90s
