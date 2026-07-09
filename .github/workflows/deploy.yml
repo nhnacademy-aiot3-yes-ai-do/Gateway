@@ -44,5 +44,6 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            export PATH=$HOME/bin:$PATH
             kubectl set image deployment/gateway-service gateway-service=${{ env.IMAGE_NAME }}:${{ github.sha }}
             kubectl rollout status deployment/gateway-service --timeout=90s
