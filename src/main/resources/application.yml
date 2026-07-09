@@ -3,15 +3,13 @@ spring:
     name: gateway
 
   cloud:
-    eureka:
-      client:
-        enabled: ${EUREKA_ENABLED:false}
     kubernetes:
       discovery:
         enabled: ${K8S_DISCOVERY_ENABLED:false}
 
 eureka:
   client:
+    enabled: ${EUREKA_ENABLED:false}
     service-url:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
 
