@@ -68,75 +68,17 @@ jobs:
 
   notify:
     needs: [ build-and-push, deploy ]
-    runs-on: ubuntu-latest
     if: always()
-
-    steps:
-      - name: Notify Discord
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          BUILD_RESULT: ${{ needs.build-and-push.result }}
-          DEPLOY_RESULT: ${{ needs.deploy.result }}
-          REPOSITORY: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          COMMIT_SHA: ${{ github.sha }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          ACTOR: ${{ github.actor }}
-          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          if [ "$BUILD_RESULT" = "success" ] && [ "$DEPLOY_RESULT" = "success" ]; then
-            TITLE="Gateway Kubernetes Deploy Success"
-            CONTENT="✅ Gateway 배포 성공"
-            DESCRIPTION="gateway-service rollout이 완료되었습니다."
-            COLOR="5763719"
-          else
-            TITLE="Gateway CI/CD Failed"
-            CONTENT="❌ Gateway 배포 실패"
-            DESCRIPTION="빌드, 이미지 push, 서버 SSH, kubectl apply 또는 rollout 중 실패했습니다."
-            COLOR="15548997"
-          fi
-          
-          COMMIT_SHORT=$(echo "$COMMIT_SHA" | cut -c1-7)
-          
-          jq -n \
-            --arg content "$CONTENT" \
-            --arg title "$TITLE" \
-            --arg description "$DESCRIPTION" \
-            --arg repository "$REPOSITORY" \
-            --arg branch "$BRANCH" \
-            --arg commit "$COMMIT_SHORT" \
-            --arg commitMessage "$COMMIT_MESSAGE" \
-            --arg actor "$ACTOR" \
-            --arg workflow "$WORKFLOW_URL" \
-            --arg buildResult "$BUILD_RESULT" \
-            --arg deployResult "$DEPLOY_RESULT" \
-            --argjson color "$COLOR" \
-            '{
-              content: $content,
-              embeds: [
-                {
-                  title: $title,
-                  description: $description,
-                  color: $color,
-                  fields: [
-                    { name: "Repository", value: $repository, inline: true },
-                    { name: "Branch", value: $branch, inline: true },
-                    { name: "Commit", value: $commit, inline: true },
-                    { name: "Commit Message", value: $commitMessage, inline: false },
-                    { name: "Actor", value: $actor, inline: true },
-                    { name: "Build", value: $buildResult, inline: true },
-                    { name: "Deploy", value: $deployResult, inline: true },
-                    { name: "Workflow", value: $workflow, inline: false }
-                  ]
-                }
-              ]
-            }' > discord-payload.json
-          
-          curl --fail --show-error --silent \
-            --connect-timeout 5 \
-            --max-time 15 \
-            --retry 2 \
-            --retry-delay 2 \
-            -H "Content-Type: application/json" \
-            -d @discord-payload.json \
-            "$DISCORD_WEBHOOK_URL"
+    uses: nhnacademy-aiot3-yes-ai-do/Webhook/.github/workflows/discord-notify.yml@main
+    with:
+      service_name: gateway-service
+      build_result: ${{ needs.build-and-push.result }}
+      deploy_result: ${{ needs.deploy.result }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      commit_sha: ${{ github.sha }}
+      commit_message: ${{ github.event.head_commit.message }}
+      actor: ${{ github.actor }}
+      workflow_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
