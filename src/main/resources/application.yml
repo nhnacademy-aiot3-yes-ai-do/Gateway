@@ -6,6 +6,23 @@ spring:
     kubernetes:
       discovery:
         enabled: ${K8S_DISCOVERY_ENABLED:false}
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - ${FRONT_URL:https://yes-nhn.site}
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
 
 eureka:
   client:
