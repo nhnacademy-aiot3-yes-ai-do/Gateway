@@ -3,7 +3,7 @@ name: sonarqube
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [develop, main]
 
 permissions:
   contents: read
@@ -11,6 +11,7 @@ permissions:
 jobs:
   analysis:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,11 +23,15 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Test and analyze
+      - name: Test and coverage check
+        run: ./mvnw -B clean verify
+
+      - name: SonarQube analysis
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          ./mvnw -B clean verify sonar:sonar \
+          ./mvnw -B sonar:sonar \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300
