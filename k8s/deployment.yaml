@@ -2,23 +2,65 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gateway-service
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  # startupProbe가 최대 90초이므로 여유를 둔다.
+  progressDeadlineSeconds: 180
+  revisionHistoryLimit: 10
+
   selector:
     matchLabels:
       app: gateway-service
+
   template:
     metadata:
       labels:
         app: gateway-service
+
     spec:
       serviceAccountName: gateway-sa
+
       containers:
         - name: gateway-service
-          image: ghcr.io/nhnacademy-aiot3-yes-ai-do/gateway-service:latest
+          # CI에서 실제 SHA 이미지로 치환하는 자리
+          image: ghcr.io/nhnacademy-aiot3-yes-ai-do/gateway:IMAGE_TAG
           imagePullPolicy: Always
+
           ports:
             - containerPort: 8080
+
           envFrom:
             - configMapRef:
                 name: gateway-config
+
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 18
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3

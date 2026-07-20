@@ -4,30 +4,49 @@ on:
   push:
     branches: [ main ]
 
+concurrency:
+  group: gateway-production
+  cancel-in-progress: false
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
-  test-and-coverage:
+  test-and-coverage-sonarqube:
     runs-on: ubuntu-latest
+    outputs:
+      coverage_result: ${{ steps.coverage.outcome }}
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: temurin
           cache: maven
 
-      - name: Run tests and coverage check
-        run: ./mvnw -B clean verify
+      - name: Run tests
+        run: ./mvnw -B clean test
+
+      - name: Check JaCoCo 40% coverage
+        id: coverage
+        run: ./mvnw -B -DskipTests verify
+
+      - name: Run SonarQube Quality Gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          ./mvnw -B sonar:sonar \
+            -Dsonar.qualitygate.wait=true \
+            -Dsonar.qualitygate.timeout=300
 
   build-and-push:
-    needs: test-and-coverage
+    needs: test-and-coverage-sonarqube
     runs-on: ubuntu-latest
 
     outputs:
@@ -75,7 +94,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "k8s/*"
-          target: "/tmp/gateway-k8s"
+          target: "/tmp/gateway-k8s-${{ github.run_id }}"
 
       - name: Apply manifests and roll out new image
         uses: appleboy/ssh-action@v1
@@ -85,28 +104,78 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eu
             export PATH=$HOME/bin:$PATH
-            kubectl apply -f /tmp/gateway-k8s/k8s/
-            kubectl set image deployment/gateway-service gateway-service=${{ needs.build-and-push.outputs.image_name }}:${{ github.sha }}
-            if ! kubectl rollout status deployment/gateway-service --timeout=90s; then
-              echo "::warning::배포 실패 - 롤백을 시도합니다"
-              if kubectl rollout undo deployment/gateway-service; then
-                kubectl rollout status deployment/gateway-service --timeout=90s
-                echo "::warning::이전 버전으로 롤백 완료"
-              else
-                echo "::error::롤백 대상이 없습니다 (최초 배포이거나 이력 소진). 수동 확인이 필요합니다"
+
+            DIR="/tmp/gateway-k8s-${{ github.run_id }}"
+            IMAGE="${{ needs.build-and-push.outputs.image_name }}"
+            TARGET_TAG="${{ github.sha }}"
+            trap 'rm -rf "$DIR"' EXIT
+
+            PREVIOUS_REVISION="$(
+              kubectl get deployment gateway-service \
+                -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' \
+                2>/dev/null || true
+            )"
+            PREVIOUS_IMAGE="$(
+              kubectl get deployment gateway-service \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="gateway-service")].image}' \
+                2>/dev/null || true
+            )"
+
+            kubectl apply -f "$DIR/k8s/rbac.yaml"
+            kubectl apply -f "$DIR/k8s/configmap.yaml"
+            kubectl apply -f "$DIR/k8s/service.yaml"
+            kubectl apply -f "$DIR/k8s/ingress.yaml"
+
+            kubectl set image \
+              -f "$DIR/k8s/deployment.yaml" \
+              gateway-service="$IMAGE:$TARGET_TAG" \
+              --local -o yaml |
+              kubectl apply -f -
+
+            if ! kubectl rollout status deployment/gateway-service --timeout=210s; then
+              echo "배포 실패 - 직전 Revision으로 롤백을 시도합니다"
+
+              if [ -z "$PREVIOUS_REVISION" ] || [ -z "$PREVIOUS_IMAGE" ]; then
+                echo "롤백 대상이 없습니다. 최초 배포 여부를 수동 확인해야 합니다"
+                exit 1
               fi
-              rm -rf /tmp/gateway-k8s
+
+              if ! kubectl rollout undo deployment/gateway-service \
+                --to-revision="$PREVIOUS_REVISION"; then
+                echo "Revision $PREVIOUS_REVISION 롤백 명령이 실패했습니다"
+                exit 1
+              fi
+
+              if ! kubectl rollout status deployment/gateway-service --timeout=210s; then
+                echo "롤백 이후 Deployment가 정상 상태에 도달하지 못했습니다"
+                exit 1
+              fi
+
+              RECOVERED_IMAGE="$(
+                kubectl get deployment gateway-service \
+                  -o jsonpath='{.spec.template.spec.containers[?(@.name=="gateway-service")].image}'
+              )"
+
+              if [ "$RECOVERED_IMAGE" != "$PREVIOUS_IMAGE" ]; then
+                echo "롤백 이미지 검증 실패: expected=$PREVIOUS_IMAGE actual=$RECOVERED_IMAGE"
+                exit 1
+              fi
+
+              echo "이전 Revision으로 롤백 완료: revision=$PREVIOUS_REVISION image=$RECOVERED_IMAGE"
               exit 1
             fi
-            rm -rf /tmp/gateway-k8s
+
+            echo "배포 완료: image=$IMAGE:$TARGET_TAG"
 
   notify:
-    needs: [ build-and-push, deploy ]
+    needs: [ test-and-coverage-sonarqube, build-and-push, deploy ]
     if: always()
     uses: nhnacademy-aiot3-yes-ai-do/Webhook/.github/workflows/discord-notify.yml@main
     with:
       service_name: gateway-service
+      coverage_result: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result }}
       build_result: ${{ needs.build-and-push.result }}
       deploy_result: ${{ needs.deploy.result }}
       repository: ${{ github.repository }}
