@@ -59,6 +59,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 이미지 이름 소문자로 변환
         id: image
@@ -86,6 +88,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Copy k8s manifests to server
         uses: appleboy/scp-action@v0.1.7
