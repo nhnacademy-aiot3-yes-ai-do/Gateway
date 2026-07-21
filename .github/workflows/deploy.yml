@@ -13,8 +13,12 @@ env:
 jobs:
   test-and-coverage-sonarqube:
     runs-on: ubuntu-latest
+
     outputs:
       coverage_result: ${{ steps.coverage.outcome }}
+      coverage_percentage: ${{ steps.sonar_metrics.outputs.coverage_percentage }}
+      sonar_url: ${{ steps.sonar_meta.outputs }}
+
     permissions:
       contents: read
 
@@ -45,6 +49,52 @@ jobs:
           ./mvnw -B sonar:sonar \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300
+
+      - name: Read SonarQube coverage
+        id: sonar_metrics
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_DASHBOARD_URL: ${{ vars.SONAR_DASHBOARD_URL }}
+          SONAR_PROJECT_KEY: yes-nhn_gateway-service
+        run: |
+            echo "coverage_percentage=not_available" >> "$GITHUB_OUTPUT"
+            echo "sonar_url=$SONAR_DASHBOARD_URL" >> "$GITHUB_OUTPUT"
+            
+            SONAR_BASE_URL="${SONAR_HOST_URL%/}"
+            
+            if ! RESPONSE="$(
+              curl --fail --show-error --silent \
+                --get "$SONAR_BASE_URL/api/measures/component" \
+                --header "Authorization: Bearer $SONAR_TOKEN" \
+                --data-urlencode "component=$SONAR_PROJECT_KEY" \
+                --data-urlencode "metricKeys=coverage"
+            )"; then
+              echo "::warning::SonarQube coverage 조회에 실패했습니다."
+              exit 0
+            fi
+            
+            COVERAGE="$(
+              echo "$RESPONSE" |
+                jq -r '.component.measures[]
+                  | select(.metric == "coverage")
+                  | .value'
+            )"
+            
+            if [ -z "$COVERAGE" ] || [ "$COVERAGE" = "null" ]; then
+              echo "::warning::SonarQube 응답에 coverage 값이 없습니다."
+              exit 0
+            fi
+            
+            echo "coverage_percentage=$COVERAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Set SonarQube dashboard URL
+        id: sonar_meta
+        env:
+          SONAR_DASHBOARD_URL: ${{ vars.SONAR_DASHBOARD_URL }}
+        run: |
+          echo "url=$SONAR_DASHBOARD_URL" >> "$GITHUB_OUTPUT"
+          
 
   build-and-push:
     needs: test-and-coverage-sonarqube
@@ -178,9 +228,9 @@ jobs:
     needs: [ test-and-coverage-sonarqube, build-and-push, deploy ]
     if: always()
     uses: nhnacademy-aiot3-yes-ai-do/Webhook/.github/workflows/discord-notify.yml@main
+
     with:
       service_name: gateway-service
-      coverage_result: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result }}
       build_result: ${{ needs.build-and-push.result }}
       deploy_result: ${{ needs.deploy.result }}
       repository: ${{ github.repository }}
@@ -189,5 +239,11 @@ jobs:
       commit_message: ${{ github.event.head_commit.message }}
       actor: ${{ github.actor }}
       workflow_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      quality_result: ${{ needs.test-and-coverage-sonarqube.result }}
+      coverage_result: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result}}
+      coverage_percentage: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_percentage || 'not_available' }}
+      sonar_url: ${{ needs.test-and-coverage-sonarqube.outputs.sonar_url || 'not_available' }}
+
     secrets:
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
