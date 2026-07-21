@@ -17,7 +17,7 @@ jobs:
     outputs:
       coverage_result: ${{ steps.coverage.outcome }}
       coverage_percentage: ${{ steps.sonar_metrics.outputs.coverage_percentage }}
-      sonar_url: ${{ steps.sonar_meta.outputs }}
+      sonar_url: ${{ steps.sonar_meta.outputs.url }}
 
     permissions:
       contents: read
@@ -33,6 +33,13 @@ jobs:
           java-version: "21"
           distribution: temurin
           cache: maven
+
+      - name: Set SonarQube dashboard URL
+        id: sonar_meta
+        env:
+          SONAR_DASHBOARD_URL: ${{ vars.SONAR_DASHBOARD_URL }}
+        run: |
+          echo "url=$SONAR_DASHBOARD_URL" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
         run: ./mvnw -B clean test
@@ -55,7 +62,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_DASHBOARD_URL: ${{ vars.SONAR_DASHBOARD_URL }}
+
           SONAR_PROJECT_KEY: yes-nhn_gateway-service
         run: |
             echo "coverage_percentage=not_available" >> "$GITHUB_OUTPUT"
@@ -87,13 +94,6 @@ jobs:
             fi
             
             echo "coverage_percentage=$COVERAGE" >> "$GITHUB_OUTPUT"
-
-      - name: Set SonarQube dashboard URL
-        id: sonar_meta
-        env:
-          SONAR_DASHBOARD_URL: ${{ vars.SONAR_DASHBOARD_URL }}
-        run: |
-          echo "url=$SONAR_DASHBOARD_URL" >> "$GITHUB_OUTPUT"
           
 
   build-and-push:
