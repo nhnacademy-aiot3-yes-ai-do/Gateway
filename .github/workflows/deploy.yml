@@ -4,6 +4,14 @@ on:
   push:
     branches: [ main ]
 
+  workflow_dispatch:
+    inputs:
+      simulate_deploy_failure:
+        description: "존재하지 않는 이미지로 롤백 테스트"
+        required: true
+        type: boolean
+        default: false
+
 concurrency:
   group: gateway-production
   cancel-in-progress: false
@@ -155,6 +163,13 @@ jobs:
             DIR="/tmp/gateway-k8s-${{ github.run_id }}"
             IMAGE="${{ needs.build-and-push.outputs.image_name }}"
             TARGET_TAG="${{ github.sha }}"
+            
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+              && [ "${{ inputs.simulate_deploy_failure }}" = "true" ]; then
+              TARGET_TAG="${{ github.sha }}-rollback-test-missing"
+              echo "롤백 테스트 모드: 존재하지 않는 이미지 태그를 사용합니다."
+            fi
+            
             trap 'rm -rf "$DIR"' EXIT
 
             PREVIOUS_REVISION="$(
@@ -186,6 +201,8 @@ jobs:
                 echo "롤백 대상이 없습니다. 최초 배포 여부를 수동 확인해야 합니다"
                 exit 1
               fi
+            
+              
 
               if ! kubectl rollout undo deployment/gateway-service \
                 --to-revision="$PREVIOUS_REVISION"; then
@@ -209,6 +226,8 @@ jobs:
               fi
 
               echo "이전 Revision으로 롤백 완료: revision=$PREVIOUS_REVISION image=$RECOVERED_IMAGE"
+              echo "롤백 기준: revision=$PREVIOUS_REVISION image=$PREVIOUS_IMAGE"
+              echo "배포 대상: image=$IMAGE:$TARGET_TAG"
               exit 1
             fi
 
