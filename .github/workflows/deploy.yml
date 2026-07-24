@@ -131,129 +131,104 @@ jobs:
             ${{ steps.image.outputs.name }}:latest
             ${{ steps.image.outputs.name }}:${{ github.sha }}
 
-  deploy:
-    needs: build-and-push
+  request-central-deploy:
+    needs: [test-and-coverage-sonarqube, build-and-push]
+    if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Copy k8s manifests to server
-        uses: appleboy/scp-action@v0.1.7
+      - name: Create Config GitHub App token
+        id: config-app-token
+        uses: actions/create-github-app-token@v3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "k8s/*"
-          target: "/tmp/gateway-k8s-${{ github.run_id }}"
+          client-id: ${{ vars.GH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Config
+          permission-contents: write
 
-      - name: Apply manifests and roll out new image
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -eu
-            export PATH=$HOME/bin:$PATH
+      - name: Request Config deployment
+        env:
+          GH_TOKEN: ${{ steps.config-app-token.outputs.token }}
+          CONFIG_REPOSITORY: ${{ github.repository_owner }}/Config
+          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          QUALITY_RESULT: ${{ needs.test-and-coverage-sonarqube.result }}
+          COVERAGE_RESULT: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result }}
+          COVERAGE_PERCENTAGE: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_percentage }}
+          BUILD_RESULT: ${{ needs.build-and-push.result }}
+          SONAR_URL: ${{ vars.SONAR_DASHBOARD_URL }}
+          SIMULATE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_deploy_failure || false }}
 
-            DIR="/tmp/gateway-k8s-${{ github.run_id }}"
-            IMAGE="${{ needs.build-and-push.outputs.image_name }}"
-            TARGET_TAG="${{ github.sha }}"
-            
-            if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
-              && [ "${{ inputs.simulate_deploy_failure }}" = "true" ]; then
-              TARGET_TAG="${{ github.sha }}-rollback-test-missing"
-              echo "롤백 테스트 모드: 존재하지 않는 이미지 태그를 사용합니다."
-            fi
-            
-            trap 'rm -rf "$DIR"' EXIT
+        run: |          
+          set -euo pipefail
 
-            PREVIOUS_REVISION="$(
-              kubectl get deployment gateway-service \
-                -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' \
-                2>/dev/null || true
-            )"
-            PREVIOUS_IMAGE="$(
-              kubectl get deployment gateway-service \
-                -o jsonpath='{.spec.template.spec.containers[?(@.name=="gateway-service")].image}' \
-                2>/dev/null || true
-            )"
+          COVERAGE_RESULT="${COVERAGE_RESULT:-not_configured}"
+          COVERAGE_PERCENTAGE="${COVERAGE_PERCENTAGE:-not_available}"
+          SONAR_URL="${SONAR_URL:-not_available}"
+          COMMIT_MESSAGE="$(git log -1 --pretty=%B)"
+          IMAGE_NAME="${IMAGE_NAME:-not_available}"
 
-            kubectl apply -f "$DIR/k8s/rbac.yaml"
-            kubectl apply -f "$DIR/k8s/configmap.yaml"
-            kubectl apply -f "$DIR/k8s/service.yaml"
-            kubectl apply -f "$DIR/k8s/ingress.yaml"
+          case "$SIMULATE_FAILURE" in
+            true|false) ;;
+            *) SIMULATE_FAILURE=false ;;
+          esac
 
-            kubectl set image \
-              -f "$DIR/k8s/deployment.yaml" \
-              gateway-service="$IMAGE:$TARGET_TAG" \
-              --local -o yaml |
-              kubectl apply -f -
+          jq -n \
+            --arg image_name "$IMAGE_NAME" \
+            --arg service_name "gateway-service" \
+            --arg repository "${{ github.repository }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg commit_sha "${{ github.sha }}" \
+            --arg commit_message "$COMMIT_MESSAGE" \
+            --arg actor "${{ github.actor }}" \
+            --arg quality_result "$QUALITY_RESULT" \
+            --arg coverage_result "$COVERAGE_RESULT" \
+            --arg coverage_percentage "$COVERAGE_PERCENTAGE" \
+            --arg sonar_url "$SONAR_URL" \
+            --arg build_result "$BUILD_RESULT" \
+            --arg workflow_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --argjson simulate_failure "$SIMULATE_FAILURE" \
+            '{
+              event_type: "deploy-service",
+              client_payload: {
+                service: {
+                  name: $service_name,
+                  repository: $repository,
+                  branch: $branch
+                },
+                commit: {
+                  sha: $commit_sha,
+                  message: $commit_message,
+                  actor: $actor
+                },
+                quality: {
+                  result: $quality_result,
+                  coverage_result: $coverage_result,
+                  coverage_percentage: $coverage_percentage,
+                  sonar_url: $sonar_url
+                },
+                build: {
+                  result: $build_result,
+                  image_name: $image_name
+                },
+                source: {
+                  workflow_url: $workflow_url
+                },
+                options: {
+                  simulate_deploy_failure: $simulate_failure
+                }
+              }
+            }' > dispatch.json
 
-            if ! kubectl rollout status deployment/gateway-service --timeout=210s; then
-              echo "배포 실패 - 직전 Revision으로 롤백을 시도합니다"
-
-              if [ -z "$PREVIOUS_REVISION" ] || [ -z "$PREVIOUS_IMAGE" ]; then
-                echo "롤백 대상이 없습니다. 최초 배포 여부를 수동 확인해야 합니다"
-                exit 1
-              fi
-            
-              
-
-              if ! kubectl rollout undo deployment/gateway-service \
-                --to-revision="$PREVIOUS_REVISION"; then
-                echo "Revision $PREVIOUS_REVISION 롤백 명령이 실패했습니다"
-                exit 1
-              fi
-
-              if ! kubectl rollout status deployment/gateway-service --timeout=210s; then
-                echo "롤백 이후 Deployment가 정상 상태에 도달하지 못했습니다"
-                exit 1
-              fi
-
-              RECOVERED_IMAGE="$(
-                kubectl get deployment gateway-service \
-                  -o jsonpath='{.spec.template.spec.containers[?(@.name=="gateway-service")].image}'
-              )"
-
-              if [ "$RECOVERED_IMAGE" != "$PREVIOUS_IMAGE" ]; then
-                echo "롤백 이미지 검증 실패: expected=$PREVIOUS_IMAGE actual=$RECOVERED_IMAGE"
-                exit 1
-              fi
-
-              echo "이전 Revision으로 롤백 완료: revision=$PREVIOUS_REVISION image=$RECOVERED_IMAGE"
-              echo "롤백 기준: revision=$PREVIOUS_REVISION image=$PREVIOUS_IMAGE"
-              echo "배포 대상: image=$IMAGE:$TARGET_TAG"
-              exit 1
-            fi
-
-            echo "배포 완료: image=$IMAGE:$TARGET_TAG"
-
-  notify:
-    needs: [ test-and-coverage-sonarqube, build-and-push, deploy ]
-    if: always()
-    uses: nhnacademy-aiot3-yes-ai-do/Webhook/.github/workflows/discord-notify.yml@main
-
-    with:
-      service_name: gateway-service
-      build_result: ${{ needs.build-and-push.result }}
-      deploy_result: ${{ needs.deploy.result }}
-      repository: ${{ github.repository }}
-      branch: ${{ github.ref_name }}
-      commit_sha: ${{ github.sha }}
-      commit_message: ${{ github.event.head_commit.message }}
-      actor: ${{ github.actor }}
-      workflow_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-
-      quality_result: ${{ needs.test-and-coverage-sonarqube.result }}
-      coverage_result: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result }}
-      coverage_percentage: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_percentage || 'not_available' }}
-      sonar_url: ${{ vars.SONAR_DASHBOARD_URL || 'not_available' }}
-
-    secrets:
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          gh api \
+            --method POST \
+            "repos/$CONFIG_REPOSITORY/dispatches" \
+            --input dispatch.json
+          
+          echo "Config 중앙 배포 요청 완료: $CONFIG_REPOSITORY"
