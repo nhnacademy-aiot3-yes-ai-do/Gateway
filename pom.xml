@@ -36,6 +36,8 @@
         <sonar.coverage.jacoco.xmlReportPaths>
             target/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
+
+        <jacoco.minimum.line.coverage>0.40</jacoco.minimum.line.coverage>
     </properties>
     <dependencies>
         <dependency>
@@ -147,7 +149,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.40</minimum>
+                                            <minimum>${jacoco.minimum.line.coverage}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
