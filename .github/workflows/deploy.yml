@@ -45,7 +45,7 @@ jobs:
       - name: Run tests
         run: ./mvnw -B clean test
 
-      - name: Check JaCoCo 40% coverage
+      - name: Check JaCoCo coverage
         id: coverage
         run: ./mvnw -B -DskipTests verify
 
@@ -63,7 +63,7 @@ jobs:
         env:
           SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_PROJECT_KEY: yes-nhn_gateway-service
+          SONAR_ANALYSIS_OUTCOME: ${{ steps.sonar.outcome }}
         run: bash .github/scripts/sonar.sh
 
   build-and-push:
@@ -130,7 +130,7 @@ jobs:
           GH_TOKEN: ${{ steps.config-app-token.outputs.token }}
           CONFIG_REPOSITORY: ${{ github.repository_owner }}/Config
 
-          SERVICE_NAME: user-server
+          SERVICE_NAME: gateway-server
           SOURCE_REPOSITORY: ${{ github.repository }}
           SOURCE_BRANCH: ${{ github.ref_name }}
           SOURCE_COMMIT_SHA: ${{ github.sha }}
