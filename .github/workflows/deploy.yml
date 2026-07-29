@@ -25,6 +25,7 @@ jobs:
     outputs:
       coverage_result: ${{ steps.coverage.outcome }}
       coverage_percentage: ${{ steps.sonar_metrics.outputs.coverage_percentage }}
+      coverage_threshold: ${{ steps.sonar_metrics.outputs.coverage_threshold }}
 
     permissions:
       contents: read
@@ -44,11 +45,12 @@ jobs:
       - name: Run tests
         run: ./mvnw -B clean test
 
-      - name: Check JaCoCo 40% coverage
+      - name: Check JaCoCo coverage
         id: coverage
         run: ./mvnw -B -DskipTests verify
 
       - name: Run SonarQube Quality Gate
+        id: sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -59,40 +61,12 @@ jobs:
 
       - name: Read SonarQube coverage
         id: sonar_metrics
+        if: always()
         env:
           SONAR_API_TOKEN: ${{ secrets.SONAR_API_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_PROJECT_KEY: yes-nhn_gateway-service
-        run: |
-          echo "coverage_percentage=not_available" >> "$GITHUB_OUTPUT"
-
-          SONAR_BASE_URL="${SONAR_HOST_URL%/}"
-
-          if ! RESPONSE="$(
-            curl --fail --show-error --silent \
-              --get "$SONAR_BASE_URL/api/measures/component" \
-              --header "Authorization: Bearer $SONAR_API_TOKEN" \
-              --data-urlencode "component=$SONAR_PROJECT_KEY" \
-              --data-urlencode "metricKeys=coverage"
-          )"; then
-            echo "::warning::SonarQube coverage 조회에 실패했습니다."
-            exit 0
-          fi
-
-          COVERAGE="$(
-            echo "$RESPONSE" |
-              jq -r '.component.measures[]
-                | select(.metric == "coverage")
-                | .value'
-          )"
-
-          if [ -z "$COVERAGE" ] || [ "$COVERAGE" = "null" ]; then
-            echo "::warning::SonarQube 응답에 coverage 값이 없습니다."
-            exit 0
-          fi
-
-          echo "coverage_percentage=$COVERAGE" >> "$GITHUB_OUTPUT"
-          
+          SONAR_ANALYSIS_OUTCOME: ${{ steps.sonar.outcome }}
+        run: bash .github/scripts/sonar.sh
 
   build-and-push:
     needs: test-and-coverage-sonarqube
@@ -157,78 +131,21 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.config-app-token.outputs.token }}
           CONFIG_REPOSITORY: ${{ github.repository_owner }}/Config
+
+          SERVICE_NAME: gateway-server
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
+          SOURCE_COMMIT_SHA: ${{ github.sha }}
+          SOURCE_ACTOR: ${{ github.actor }}
+          SOURCE_WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
           IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
           QUALITY_RESULT: ${{ needs.test-and-coverage-sonarqube.result }}
           COVERAGE_RESULT: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_result }}
           COVERAGE_PERCENTAGE: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_percentage }}
+          COVERAGE_THRESHOLD: ${{ needs.test-and-coverage-sonarqube.outputs.coverage_threshold }}
           BUILD_RESULT: ${{ needs.build-and-push.result }}
           SONAR_URL: ${{ vars.SONAR_DASHBOARD_URL }}
           SIMULATE_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_deploy_failure || false }}
 
-        run: |          
-          set -euo pipefail
-
-          COVERAGE_RESULT="${COVERAGE_RESULT:-not_configured}"
-          COVERAGE_PERCENTAGE="${COVERAGE_PERCENTAGE:-not_available}"
-          SONAR_URL="${SONAR_URL:-not_available}"
-          COMMIT_MESSAGE="$(git log -1 --pretty=%B)"
-          IMAGE_NAME="${IMAGE_NAME:-not_available}"
-
-          case "$SIMULATE_FAILURE" in
-            true|false) ;;
-            *) SIMULATE_FAILURE=false ;;
-          esac
-
-          jq -n \
-            --arg image_name "$IMAGE_NAME" \
-            --arg service_name "gateway-service" \
-            --arg repository "${{ github.repository }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg commit_sha "${{ github.sha }}" \
-            --arg commit_message "$COMMIT_MESSAGE" \
-            --arg actor "${{ github.actor }}" \
-            --arg quality_result "$QUALITY_RESULT" \
-            --arg coverage_result "$COVERAGE_RESULT" \
-            --arg coverage_percentage "$COVERAGE_PERCENTAGE" \
-            --arg sonar_url "$SONAR_URL" \
-            --arg build_result "$BUILD_RESULT" \
-            --arg workflow_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --argjson simulate_failure "$SIMULATE_FAILURE" \
-            '{
-              event_type: "deploy-service",
-              client_payload: {
-                service: {
-                  name: $service_name,
-                  repository: $repository,
-                  branch: $branch
-                },
-                commit: {
-                  sha: $commit_sha,
-                  message: $commit_message,
-                  actor: $actor
-                },
-                quality: {
-                  result: $quality_result,
-                  coverage_result: $coverage_result,
-                  coverage_percentage: $coverage_percentage,
-                  sonar_url: $sonar_url
-                },
-                build: {
-                  result: $build_result,
-                  image_name: $image_name
-                },
-                source: {
-                  workflow_url: $workflow_url
-                },
-                options: {
-                  simulate_deploy_failure: $simulate_failure
-                }
-              }
-            }' > dispatch.json
-
-          gh api \
-            --method POST \
-            "repos/$CONFIG_REPOSITORY/dispatches" \
-            --input dispatch.json
-          
-          echo "Config 중앙 배포 요청 완료: $CONFIG_REPOSITORY"
+        run: bash .github/scripts/config-deployment.sh
