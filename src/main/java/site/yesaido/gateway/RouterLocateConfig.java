@@ -8,14 +8,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RouterLocateConfig {
 
-    private static final String BOOKSEARCH_LB_URL = "lb://team3-booksearch";
+    private static final String USER_LB_URL = "lb://user-server";
 
     @Bean
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
         return builder.routes()
-                .route("team3-booksearch",
-                        p -> p.path("/api/v2/books/**")
-                                .uri(BOOKSEARCH_LB_URL))
+                .route("user-server",
+                        p -> p.path("/users/**", "/auth/**")
+                                .uri(USER_LB_URL))
+
                 .build();
     }
 }

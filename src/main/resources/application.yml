@@ -14,6 +14,7 @@ spring:
               '[/**]':
                 allowedOrigins:
                   - ${FRONT_URL:https://yes-nhn.site}
+                  - "http://localhost:8082"
                 allowedMethods:
                   - GET
                   - POST
