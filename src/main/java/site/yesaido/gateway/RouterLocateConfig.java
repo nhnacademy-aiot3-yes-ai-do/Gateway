@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class RouterLocateConfig {
 
     private static final String USER_LB_URL = "lb://user-server";
+    private static final String CULTIVATION_LB_URL = "lb://cultivation-server";
 
     @Bean
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
@@ -16,7 +17,9 @@ public class RouterLocateConfig {
                 .route("user-server",
                         p -> p.path("/users/**", "/auth/**")
                                 .uri(USER_LB_URL))
-
+                .route("cultivation-server",
+                        p -> p.path("/api/cultivations/**")
+                                .uri(CULTIVATION_LB_URL))
                 .build();
     }
 }
