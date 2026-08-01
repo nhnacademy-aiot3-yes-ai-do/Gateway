@@ -20,7 +20,7 @@ import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
-    private static final List<String> PUBLIC_PATHS = List.of("/auth/login", "/users/signup", "/users/check-email", "/users/check-nickname");
+    private static final List<String> PUBLIC_PATHS = List.of("/api/auth/login", "/api/users/signup", "/api/users/check-email", "/api/users/check-nickname");
 
     private final Key key;
 
