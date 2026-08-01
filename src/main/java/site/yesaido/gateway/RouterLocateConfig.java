@@ -15,7 +15,7 @@ public class RouterLocateConfig {
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
         return builder.routes()
                 .route("user-server",
-                        p -> p.path("/users/**", "/auth/**")
+                        p -> p.path("/api/users/**", "/api/auth/**")
                                 .uri(USER_LB_URL))
                 .route("cultivation-server",
                         p -> p.path("/api/cultivations/**")
