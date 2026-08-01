@@ -1,5 +1,6 @@
 package site.yesaido.gateway;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,39 +21,68 @@ class RouterLocateConfigTest {
     @Autowired
     private RouteLocator routeLocator;
 
-    private Route findBooksearchRoute() {
+    private Route findRoute(String routeId) {
         List<Route> routes = routeLocator.getRoutes().collectList().block();
         return routes.stream()
-                .filter(route -> route.getId().equals("team3-booksearch"))
+                .filter(route -> route.getId().equals(routeId))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("team3-booksearch route not found"));
+                .orElseThrow(() -> new AssertionError(routeId + " route not found"));
+    }
+
+    private boolean matches(Route route, String path) {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get(path).build());
+        return Boolean.TRUE.equals(Mono.from(route.getPredicate().apply(exchange)).block());
     }
 
     @Test
-    void booksearchRouteTargetsLoadBalancedUri() {
-        Route route = findBooksearchRoute();
+    @DisplayName("user-server 라우트는 lb://user-server로 향한다")
+    void userServerRouteTargetsLoadBalancedUri() {
+        Route route = findRoute("user-server");
 
         assertThat(route.getUri().getScheme()).isEqualTo("lb");
-        assertThat(route.getUri().getHost()).isEqualTo("team3-booksearch");
+        assertThat(route.getUri().getHost()).isEqualTo("user-server");
     }
 
     @Test
-    void booksearchRouteMatchesBooksApiPath() {
-        Route route = findBooksearchRoute();
+    @DisplayName("user-server 라우트는 /api/users/**, /api/auth/** 경로를 매칭한다")
+    void userServerRouteMatchesUsersAndAuthPaths() {
+        Route route = findRoute("user-server");
 
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v2/books/1").build());
-
-        assertThat(Mono.from(route.getPredicate().apply(exchange)).block()).isTrue();
+        assertThat(matches(route, "/api/users/check-email")).isTrue();
+        assertThat(matches(route, "/api/auth/login")).isTrue();
     }
 
     @Test
-    void booksearchRouteDoesNotMatchOtherPaths() {
-        Route route = findBooksearchRoute();
+    @DisplayName("user-server 라우트는 다른 경로를 매칭하지 않는다")
+    void userServerRouteDoesNotMatchOtherPaths() {
+        Route route = findRoute("user-server");
 
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v2/orders/1").build());
+        assertThat(matches(route, "/api/cultivations")).isFalse();
+    }
 
-        assertThat(Mono.from(route.getPredicate().apply(exchange)).block()).isFalse();
+    @Test
+    @DisplayName("cultivation-server 라우트는 lb://cultivation-server로 향한다")
+    void cultivationServerRouteTargetsLoadBalancedUri() {
+        Route route = findRoute("cultivation-server");
+
+        assertThat(route.getUri().getScheme()).isEqualTo("lb");
+        assertThat(route.getUri().getHost()).isEqualTo("cultivation-server");
+    }
+
+    @Test
+    @DisplayName("cultivation-server 라우트는 /api/cultivations/** 경로를 매칭한다")
+    void cultivationServerRouteMatchesCultivationsPath() {
+        Route route = findRoute("cultivation-server");
+
+        assertThat(matches(route, "/api/cultivations/1")).isTrue();
+    }
+
+    @Test
+    @DisplayName("cultivation-server 라우트는 다른 경로를 매칭하지 않는다")
+    void cultivationServerRouteDoesNotMatchOtherPaths() {
+        Route route = findRoute("cultivation-server");
+
+        assertThat(matches(route, "/api/users/1")).isFalse();
     }
 }
