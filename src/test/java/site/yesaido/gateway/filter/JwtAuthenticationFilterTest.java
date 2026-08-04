@@ -14,6 +14,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.net.InetSocketAddress;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +59,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
@@ -70,7 +71,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
     }
 
     @Test
@@ -153,5 +154,36 @@ class JwtAuthenticationFilterTest {
     @DisplayName("필터 순서는 -1")
     void filterOrderIsMinusOne() {
         assertThat(filter.getOrder()).isEqualTo(-1);
+    }
+
+    @Test
+    @DisplayName("X-Forwarded-For가 있으면 첫 번째 IP를 X-Real-Client-Ip로 주입한다")
+    void injectsRealClientIpFromForwardedFor() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/login")
+                        .header("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-Real-Client-Ip")).isEqualTo("203.0.113.10");
+    }
+
+    @Test
+    @DisplayName("클라이언트가 직접 X-Real-Client-Ip를 위조해도 실제 커넥션 정보로 덮어쓴다")
+    void overridesSpoofedRealClientIpHeader() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/login")
+                        .header("X-Real-Client-Ip", "9.9.9.9")
+                        .remoteAddress(new InetSocketAddress("127.0.0.1", 12345))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-Real-Client-Ip")).isEqualTo("127.0.0.1");
     }
 }
