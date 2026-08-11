@@ -20,7 +20,17 @@ import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
-    private static final List<String> PUBLIC_PATHS = List.of("/api/auth/login", "/api/users/signup", "/api/users/check-email", "/api/users/check-nickname");
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/auth/login",
+            "/api/auth/reissue",
+            "/api/auth/email/send",
+            "/api/auth/email/verify",
+            "/api/users/signup",
+            "/api/users/check-email",
+            "/api/users/check-nickname"
+    );
+    private static final List<String> ADMIN_PATHS = List.of("/api/admin");
+    private static final String ADMIN_ROLE = "ADMIN";
 
     private final Key key;
 
@@ -42,10 +52,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         try {
             Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authHeader.substring(7)).getBody();
-            ServerHttpRequest mutated = exchange.getRequest().mutate()
-                    .header("X-User-Id", claims.getSubject())
-                    .build();
-            return chain.filter(exchange.mutate().request(mutated).build());
+            String role = claims.get("role", String.class);
+            if (ADMIN_PATHS.stream().anyMatch(path::startsWith) && !ADMIN_ROLE.equals(role)) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
+
+            ServerHttpRequest.Builder mutatedBuilder = exchange.getRequest().mutate()
+                    .header("X-User-Id", claims.getSubject());
+            if (role != null) {
+                mutatedBuilder.header("X-User-Role", role);
+            }
+
+            return chain.filter(exchange.mutate().request(mutatedBuilder.build()).build());
         } catch (JwtException | IllegalArgumentException e) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
