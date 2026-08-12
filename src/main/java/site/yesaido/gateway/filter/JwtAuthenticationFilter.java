@@ -22,16 +22,18 @@ import java.util.List;
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/login",
-            "/api/auth/reissue",
-            "/api/auth/email/send",
-            "/api/auth/email/verify",
             "/api/users/signup",
             "/api/users/check-email",
-            "/api/users/check-nickname"
+            "/api/users/check-nickname",
+            "/api/auth/email",
+            "/api/auth/dormant/release",
+            "/api/auth/reissue",
+            "/api/auth/oauth2",
+            "/api/auth/oauth2/google"
     );
+
     private static final List<String> ADMIN_PATHS = List.of("/api/admin");
     private static final String ADMIN_ROLE = "ADMIN";
-
     private final Key key;
 
     public JwtAuthenticationFilter(@Value("${jwt.secret}") String secret) {
