@@ -85,4 +85,33 @@ class RouterLocateConfigTest {
 
         assertThat(matches(route, "/api/users/1")).isFalse();
     }
+
+    @Test
+    @DisplayName("notification-server 라우트는 lb://notification-server로 향한다")
+    void notificationServerRouteTargetsLoadBalancedUri() {
+        Route route = findRoute("notification-server");
+
+        assertThat(route.getUri().getScheme()).isEqualTo("lb");
+        assertThat(route.getUri().getHost()).isEqualTo("notification-server");
+    }
+
+    @Test
+    @DisplayName("notification-server 라우트는 Notification API 경로를 매칭한다")
+    void notificationServerRouteMatchesNotificationPaths() {
+        Route route = findRoute("notification-server");
+
+        assertThat(matches(route, "/api/v1/notifications")).isTrue();
+        assertThat(matches(route, "/api/v1/notification-endpoints")).isTrue();
+        assertThat(matches(route, "/api/v1/notification-subscriptions/1/enabled")).isTrue();
+        assertThat(matches(route, "/api/v1/notification-subscription-types")).isTrue();
+    }
+
+    @Test
+    @DisplayName("notification-server 라우트는 다른 경로를 매칭하지 않는다")
+    void notificationServerRouteDoesNotMatchOtherPaths() {
+        Route route = findRoute("notification-server");
+
+        assertThat(matches(route, "/api/users/1")).isFalse();
+        assertThat(matches(route, "/api/cultivations/1")).isFalse();
+    }
 }

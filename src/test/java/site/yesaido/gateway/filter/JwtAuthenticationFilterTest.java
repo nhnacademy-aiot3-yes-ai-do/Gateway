@@ -74,6 +74,23 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("공개 경로(이메일 인증 발송/검증)는 토큰 없이도 통과")
+    void publicEmailAuthPathsBypassAuthentication() {
+        ServerWebExchange sendExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/email/send").build());
+        filter.filter(sendExchange, chain).block();
+        verify(chain).filter(sendExchange);
+
+        reset(chain);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        ServerWebExchange verifyExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/email/verify").build());
+        filter.filter(verifyExchange, chain).block();
+        verify(chain).filter(verifyExchange);
+    }
+
+    @Test
     @DisplayName("Authorization 헤더 없으면 401")
     void missingAuthorizationHeaderReturns401() {
         ServerWebExchange exchange = MockServerWebExchange.from(
