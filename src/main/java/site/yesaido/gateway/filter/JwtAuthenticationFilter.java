@@ -32,13 +32,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/auth/oauth2/google"
     );
 
-    private static final List<String> ADMIN_PATHS = List.of("/api/admin");
-    private static final String ADMIN_ROLE = "ADMIN";
     private final Key key;
 
     public JwtAuthenticationFilter(@Value("${jwt.secret}") String secret) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
@@ -55,10 +54,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         try {
             Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authHeader.substring(7)).getBody();
             String role = claims.get("role", String.class);
-            if (ADMIN_PATHS.stream().anyMatch(path::startsWith) && !ADMIN_ROLE.equals(role)) {
-                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
-                return exchange.getResponse().setComplete();
-            }
 
             ServerHttpRequest.Builder mutatedBuilder = exchange.getRequest().mutate()
                     .header("X-User-Id", claims.getSubject());
@@ -73,8 +68,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
     }
 
+    // -2: 인증 . -1: 인가 -> 인증 필터 후 인가 필터
     @Override
     public int getOrder() {
-        return -1;
+        return -2;
     }
 }
