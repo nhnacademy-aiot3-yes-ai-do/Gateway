@@ -3,7 +3,8 @@ name: pr-review-notify
 on:
   pull_request:
     branches: [develop, main]
-    types: [opened, ready_for_review]
+    # reopened/synchronize: PR 재오픈·추가 푸시 시 Discord 리뷰 알림 재전송
+    types: [opened, ready_for_review, reopened, synchronize]
 
 permissions:
   contents: read
