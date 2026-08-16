@@ -16,10 +16,17 @@ public class RouterLocateConfig {
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
         return builder.routes()
                 .route("user-server",
-                        p -> p.path("/api/users/**", "/api/auth/**")
+                        p -> p.path(
+                                        "/api/users/**",
+                                        "/api/auth/**",
+                                        "/api/inquiries/**",
+                                        "/api/admin/inquiries/**")
                                 .uri(USER_LB_URL))
                 .route("cultivation-server",
-                        p -> p.path("/api/cultivations/**")
+                        p -> p.path(
+                                        "/api/cultivations/**",
+                                        "/api/v1/mushroom-references/**",
+                                        "/api/v1/sensor-types/**")
                                 .uri(CULTIVATION_LB_URL))
                 .route("notification-server",
                         p -> p.path(

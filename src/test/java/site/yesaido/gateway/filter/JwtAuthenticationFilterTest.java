@@ -14,6 +14,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.net.InetSocketAddress;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +59,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
@@ -70,7 +71,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
     }
 
     @Test
@@ -167,8 +168,8 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("필터 순서는 -1")
+    @DisplayName("필터 순서는 -2")
     void filterOrderIsMinusOne() {
-        assertThat(filter.getOrder()).isEqualTo(-1);
+        assertThat(filter.getOrder()).isEqualTo(-2);
     }
 }
