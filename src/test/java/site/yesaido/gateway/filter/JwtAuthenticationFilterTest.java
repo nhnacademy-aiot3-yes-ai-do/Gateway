@@ -168,8 +168,8 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("필터 순서는 -1")
+    @DisplayName("필터 순서는 -2")
     void filterOrderIsMinusOne() {
-        assertThat(filter.getOrder()).isEqualTo(-1);
+        assertThat(filter.getOrder()).isEqualTo(-2);
     }
 }
