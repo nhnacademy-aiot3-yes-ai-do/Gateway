@@ -56,11 +56,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             String role = claims.get("role", String.class);
 
             ServerHttpRequest.Builder mutatedBuilder = exchange.getRequest().mutate()
-                    .header("X-User-Id", claims.getSubject());
-            if (role != null) {
-                mutatedBuilder.header("X-User-Role", role);
-            }
+                    .headers(headers -> {
+                        headers.remove("X-User-Id");
+                        headers.remove("X-User-Role");
 
+                        headers.set("X-User-Id", claims.getSubject());
+
+                        if (role != null){
+                            headers.set("X-User-Role", role);
+                        }
+                    });
+            
             return chain.filter(exchange.mutate().request(mutatedBuilder.build()).build());
         } catch (JwtException | IllegalArgumentException e) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);

@@ -168,8 +168,31 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("클라이언트가 보낸 X-User-Id는 JWT 사용자 ID로 덮어쓴다")
+    void clientUserIdHeaderIsReplacedWithJwtSubject() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/inquiries/1")
+                        .header("Authorization", "Bearer " + validToken("42"))
+                        .header("X-User-Id", "999")
+                        .build()
+        );
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor =
+                ArgumentCaptor.forClass(ServerWebExchange.class);
+
+        verify(chain).filter(captor.capture());
+
+        assertThat(captor.getValue().getRequest()
+                .getHeaders()
+                .get("X-User-Id"))
+                .containsExactly("42");
+    }
+
+    @Test
     @DisplayName("필터 순서는 -2")
-    void filterOrderIsMinusOne() {
+    void filterOrderIsMinusTwo() {
         assertThat(filter.getOrder()).isEqualTo(-2);
     }
 }
