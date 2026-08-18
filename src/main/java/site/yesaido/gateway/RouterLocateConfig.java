@@ -11,6 +11,7 @@ public class RouterLocateConfig {
     private static final String USER_LB_URL = "lb://user-server";
     private static final String CULTIVATION_LB_URL = "lb://cultivation-server";
     private static final String NOTIFICATION_LB_URL = "lb://notification-server";
+    private static final String AI_LB_URL = "lb://ai-server";
 
     @Bean
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
@@ -39,6 +40,10 @@ public class RouterLocateConfig {
                                         "/api/v1/notification-subscription-types",
                                         "/api/v1/notification-subscription-types/**")
                                 .uri(NOTIFICATION_LB_URL))
+                .route("ai-server",
+                        p -> p.path(
+                                        "/api/mushrooms/**")
+                                .uri(AI_LB_URL))
                 .build();
     }
 }
