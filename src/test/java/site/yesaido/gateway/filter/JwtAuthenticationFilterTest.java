@@ -58,7 +58,7 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
@@ -70,7 +70,24 @@ class JwtAuthenticationFilterTest {
 
         filter.filter(exchange, chain).block();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
+    }
+
+    @Test
+    @DisplayName("공개 경로(이메일 인증 발송/검증)는 토큰 없이도 통과")
+    void publicEmailAuthPathsBypassAuthentication() {
+        ServerWebExchange sendExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/email/send").build());
+        filter.filter(sendExchange, chain).block();
+        verify(chain).filter(sendExchange);
+
+        reset(chain);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        ServerWebExchange verifyExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/email/verify").build());
+        filter.filter(verifyExchange, chain).block();
+        verify(chain).filter(verifyExchange);
     }
 
     @Test
@@ -150,8 +167,72 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("필터 순서는 -1")
-    void filterOrderIsMinusOne() {
-        assertThat(filter.getOrder()).isEqualTo(-1);
+    @DisplayName("클라이언트가 보낸 X-User-Id는 JWT 사용자 ID로 덮어쓴다")
+    void clientUserIdHeaderIsReplacedWithJwtSubject() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/inquiries/1")
+                        .header("Authorization", "Bearer " + validToken("42"))
+                        .header("X-User-Id", "999")
+                        .build()
+        );
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor =
+                ArgumentCaptor.forClass(ServerWebExchange.class);
+
+        verify(chain).filter(captor.capture());
+
+        assertThat(captor.getValue().getRequest()
+                .getHeaders()
+                .get("X-User-Id"))
+                .containsExactly("42");
+    }
+
+    @Test
+    @DisplayName("필터 순서는 -2")
+    void filterOrderIsMinusTwo() {
+        assertThat(filter.getOrder()).isEqualTo(-2);
+    }
+
+    private String validTokenWithRole(String subject, String role) {
+        return Jwts.builder()
+                .setSubject(subject)
+                .claim("role", role)
+                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    @Test
+    @DisplayName("role 클레임이 있는 JWT면 X-User-Role 헤더도 추가해서 통과")
+    void validTokenWithRoleAddsUserRoleHeader() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/admin/inquiries")
+                        .header("Authorization", "Bearer " + validTokenWithRole("42", "ADMIN"))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-User-Id")).isEqualTo("42");
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-User-Role")).isEqualTo("ADMIN");
+    }
+
+    @Test
+    @DisplayName("role 클레임이 없으면 클라이언트가 보낸 X-User-Role 헤더도 제거한다")
+    void clientSpoofedRoleHeaderIsStrippedWhenJwtHasNoRole() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/cultivations")
+                        .header("Authorization", "Bearer " + validToken("42"))
+                        .header("X-User-Role", "ADMIN")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().get("X-User-Role")).isNull();
     }
 }

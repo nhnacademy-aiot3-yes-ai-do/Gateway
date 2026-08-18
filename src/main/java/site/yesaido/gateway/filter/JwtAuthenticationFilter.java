@@ -20,13 +20,24 @@ import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
-    private static final List<String> PUBLIC_PATHS = List.of("/api/auth/login", "/api/users/signup", "/api/users/check-email", "/api/users/check-nickname");
+    private static final List<String> PUBLIC_PATHS = List.of(
+            "/api/auth/login",
+            "/api/users/signup",
+            "/api/users/check-email",
+            "/api/users/check-nickname",
+            "/api/auth/email",
+            "/api/auth/dormant/release",
+            "/api/auth/reissue",
+            "/api/auth/oauth2",
+            "/api/auth/oauth2/google"
+    );
 
     private final Key key;
 
     public JwtAuthenticationFilter(@Value("${jwt.secret}") String secret) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
@@ -42,18 +53,28 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         try {
             Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authHeader.substring(7)).getBody();
-            ServerHttpRequest mutated = exchange.getRequest().mutate()
-                    .header("X-User-Id", claims.getSubject())
-                    .build();
-            return chain.filter(exchange.mutate().request(mutated).build());
+            String role = claims.get("role", String.class);
+
+            ServerHttpRequest.Builder mutatedBuilder = exchange.getRequest().mutate();
+            mutatedBuilder.headers(headers -> {
+                headers.set("X-User-Id", claims.getSubject());
+                if (role != null) {
+                    headers.set("X-User-Role", role);
+                } else {
+                    headers.remove("X-User-Role");
+                }
+            });
+
+            return chain.filter(exchange.mutate().request(mutatedBuilder.build()).build());
         } catch (JwtException | IllegalArgumentException e) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
     }
 
+    // -2: 인증 . -1: 인가 -> 인증 필터 후 인가 필터
     @Override
     public int getOrder() {
-        return -1;
+        return -2;
     }
 }
