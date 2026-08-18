@@ -2,6 +2,8 @@ package site.yesaido.gateway;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.route.Route;
@@ -36,15 +38,6 @@ class RouterLocateConfigTest {
     }
 
     @Test
-    @DisplayName("user-server 라우트는 lb://user-server로 향한다")
-    void userServerRouteTargetsLoadBalancedUri() {
-        Route route = findRoute("user-server");
-
-        assertThat(route.getUri().getScheme()).isEqualTo("lb");
-        assertThat(route.getUri().getHost()).isEqualTo("user-server");
-    }
-
-    @Test
     @DisplayName("user-server 라우트는 /api/users/**, /api/auth/** 경로를 매칭한다")
     void userServerRouteMatchesUsersAndAuthPaths() {
         Route route = findRoute("user-server");
@@ -59,15 +52,6 @@ class RouterLocateConfigTest {
         Route route = findRoute("user-server");
 
         assertThat(matches(route, "/api/cultivations")).isFalse();
-    }
-
-    @Test
-    @DisplayName("cultivation-server 라우트는 lb://cultivation-server로 향한다")
-    void cultivationServerRouteTargetsLoadBalancedUri() {
-        Route route = findRoute("cultivation-server");
-
-        assertThat(route.getUri().getScheme()).isEqualTo("lb");
-        assertThat(route.getUri().getHost()).isEqualTo("cultivation-server");
     }
 
     @Test
@@ -86,13 +70,14 @@ class RouterLocateConfigTest {
         assertThat(matches(route, "/api/users/1")).isFalse();
     }
 
-    @Test
-    @DisplayName("notification-server 라우트는 lb://notification-server로 향한다")
-    void notificationServerRouteTargetsLoadBalancedUri() {
-        Route route = findRoute("notification-server");
+    @ParameterizedTest
+    @ValueSource(strings = {"user-server", "cultivation-server", "notification-server"})
+    @DisplayName("라우트는 lb://{routeId}로 향한다")
+    void routeTargetsLoadBalancedUri(String routeId) {
+        Route route = findRoute(routeId);
 
         assertThat(route.getUri().getScheme()).isEqualTo("lb");
-        assertThat(route.getUri().getHost()).isEqualTo("notification-server");
+        assertThat(route.getUri().getHost()).isEqualTo(routeId);
     }
 
     @Test
