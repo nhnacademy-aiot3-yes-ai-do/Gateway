@@ -1,5 +1,6 @@
 package site.yesaido.gateway.filter;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -16,7 +17,7 @@ public class RoleAuthorizationFilter implements GlobalFilter, Ordered {
     private static final String ADMIN_ROLE = "ADMIN";
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, @NonNull GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
 
         if (ADMIN_PATHS.stream().anyMatch(path::startsWith)) {
