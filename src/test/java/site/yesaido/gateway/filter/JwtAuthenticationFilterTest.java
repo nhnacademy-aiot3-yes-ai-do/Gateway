@@ -14,7 +14,6 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.net.InetSocketAddress;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -194,5 +193,46 @@ class JwtAuthenticationFilterTest {
     @DisplayName("필터 순서는 -2")
     void filterOrderIsMinusTwo() {
         assertThat(filter.getOrder()).isEqualTo(-2);
+    }
+
+    private String validTokenWithRole(String subject, String role) {
+        return Jwts.builder()
+                .setSubject(subject)
+                .claim("role", role)
+                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    @Test
+    @DisplayName("role 클레임이 있는 JWT면 X-User-Role 헤더도 추가해서 통과")
+    void validTokenWithRoleAddsUserRoleHeader() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/admin/inquiries")
+                        .header("Authorization", "Bearer " + validTokenWithRole("42", "ADMIN"))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-User-Id")).isEqualTo("42");
+        assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-User-Role")).isEqualTo("ADMIN");
+    }
+
+    @Test
+    @DisplayName("role 클레임이 없으면 클라이언트가 보낸 X-User-Role 헤더도 제거한다")
+    void clientSpoofedRoleHeaderIsStrippedWhenJwtHasNoRole() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/cultivations")
+                        .header("Authorization", "Bearer " + validToken("42"))
+                        .header("X-User-Role", "ADMIN")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
+        verify(chain).filter(captor.capture());
+        assertThat(captor.getValue().getRequest().getHeaders().get("X-User-Role")).isNull();
     }
 }
