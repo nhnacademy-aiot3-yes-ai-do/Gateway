@@ -1,2 +1,9 @@
 jwt:
   secret: test-jwt-secret-key-for-spring-boot-test-context-loading-only
+
+gateway:
+  upstream:
+    user-url: ${USER_SERVER_URL:http://localhost:8081}
+    cultivation-url: ${CULTIVATION_SERVER_URL:http://localhost:8084}
+    notification-url: ${NOTIFICATION_SERVER_URL:http://localhost:8085}
+    ai-url: ${AI_SERVER_URL:http://localhost:8000}

@@ -67,6 +67,20 @@ class RoleAuthorizationFilterTest {
     }
 
     @Test
+    @DisplayName("/api/v1/admin 경로는 ADMIN이 아닌 role이면 403")
+    void apiV1AdminPathWithNonAdminRoleIsForbidden() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/admin/sensor-types")
+                        .header("X-User-Role", "USER")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     @DisplayName("관리자 경로가 아니면 role과 무관하게 통과")
     void nonAdminPathBypassesRoleCheck() {
         ServerWebExchange exchange = MockServerWebExchange.from(
