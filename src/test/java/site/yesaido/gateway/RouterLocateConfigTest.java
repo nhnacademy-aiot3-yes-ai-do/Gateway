@@ -3,7 +3,7 @@ package site.yesaido.gateway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.route.Route;
@@ -55,11 +55,14 @@ class RouterLocateConfigTest {
     }
 
     @Test
-    @DisplayName("cultivation-server 라우트는 /api/cultivations/** 경로를 매칭한다")
-    void cultivationServerRouteMatchesCultivationsPath() {
+    @DisplayName("cultivation-server 라우트는 재배지 및 관리자 센서 API의 /api/v1 경로를 매칭한다")
+    void cultivationServerRouteMatchesCultivationApiV1Paths() {
         Route route = findRoute("cultivation-server");
 
-        assertThat(matches(route, "/api/cultivations/1")).isTrue();
+        assertThat(matches(route, "/api/v1/cultivations/1")).isTrue();
+        assertThat(matches(route, "/api/v1/admin/mushroom-references")).isTrue();
+        assertThat(matches(route, "/api/v1/admin/sensor-types")).isTrue();
+        assertThat(matches(route, "/api/cultivations/1")).isFalse();
     }
 
     @Test
@@ -71,13 +74,19 @@ class RouterLocateConfigTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"user-server", "cultivation-server", "notification-server"})
-    @DisplayName("라우트는 lb://{routeId}로 향한다")
-    void routeTargetsLoadBalancedUri(String routeId) {
+    @CsvSource({
+            "user-server, 8081",
+            "cultivation-server, 8084",
+            "notification-server, 8085",
+            "ai-server, 8000"
+    })
+    @DisplayName("라우트는 로컬 서비스의 명시 HTTP URL로 향한다")
+    void routeTargetsConfiguredDirectHttpUrl(String routeId, int port) {
         Route route = findRoute(routeId);
 
-        assertThat(route.getUri().getScheme()).isEqualTo("lb");
-        assertThat(route.getUri().getHost()).isEqualTo(routeId);
+        assertThat(route.getUri().getScheme()).isEqualTo("http");
+        assertThat(route.getUri().getHost()).isEqualTo("localhost");
+        assertThat(route.getUri().getPort()).isEqualTo(port);
     }
 
     @Test
@@ -97,6 +106,6 @@ class RouterLocateConfigTest {
         Route route = findRoute("notification-server");
 
         assertThat(matches(route, "/api/users/1")).isFalse();
-        assertThat(matches(route, "/api/cultivations/1")).isFalse();
+        assertThat(matches(route, "/api/v1/cultivations/1")).isFalse();
     }
 }

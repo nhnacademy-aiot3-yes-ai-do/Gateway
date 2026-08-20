@@ -12,7 +12,7 @@ import java.util.List;
 
 @Component
 public class RoleAuthorizationFilter implements GlobalFilter, Ordered {
-    private static final List<String> ADMIN_PATHS = List.of("/api/admin");
+    private static final List<String> ADMIN_PATHS = List.of("/api/admin", "/api/v1/admin");
     private static final String ADMIN_ROLE = "ADMIN";
 
     @Override
