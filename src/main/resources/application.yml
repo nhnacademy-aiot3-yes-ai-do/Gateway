@@ -24,10 +24,10 @@ spring:
 
 gateway:
   upstream:
-    user-url: ${USER_SERVER_URL:http://localhost:8081}
-    cultivation-url: ${CULTIVATION_SERVER_URL:http://localhost:8084}
-    notification-url: ${NOTIFICATION_SERVER_URL:http://localhost:8085}
-    ai-url: ${AI_SERVER_URL:http://localhost:8000}
+    user-url: ${USER_SERVER_URL}
+    cultivation-url: ${CULTIVATION_SERVER_URL}
+    notification-url: ${NOTIFICATION_SERVER_URL}
+    ai-url: ${AI_SERVER_URL}
 
 logging:
   level:
