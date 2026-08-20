@@ -25,8 +25,9 @@ public class RouterLocateConfig {
                                 .uri(USER_LB_URL))
                 .route("cultivation-server",
                         p -> p.path(
-                                        "/api/cultivations/**",
+                                        "/api/v1/cultivations/**",
                                         "/api/v1/mushroom-references/**",
+                                        "/api/v1/admin/mushroom-references/**",
                                         "/api/v1/sensor-types/**",
                                         "/api/v1/admin/sensor-types/**")
                                 .uri(CULTIVATION_LB_URL))
