@@ -1,17 +1,18 @@
 package site.yesaido.gateway;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@RequiredArgsConstructor
 @Configuration
+@EnableConfigurationProperties(GatewayUpstreamProperties.class)
 public class RouterLocateConfig {
 
-    private static final String USER_LB_URL = "lb://user-server";
-    private static final String CULTIVATION_LB_URL = "lb://cultivation-server";
-    private static final String NOTIFICATION_LB_URL = "lb://notification-server";
-    private static final String AI_LB_URL = "lb://ai-server";
+    private final GatewayUpstreamProperties upstreamProperties;
 
     @Bean
     public RouteLocator myRoute(RouteLocatorBuilder builder) {
@@ -22,13 +23,15 @@ public class RouterLocateConfig {
                                         "/api/auth/**",
                                         "/api/inquiries/**",
                                         "/api/admin/inquiries/**")
-                                .uri(USER_LB_URL))
+                                .uri(upstreamProperties.userUrl().toString()))
                 .route("cultivation-server",
                         p -> p.path(
-                                        "/api/cultivations/**",
+                                        "/api/v1/cultivations/**",
                                         "/api/v1/mushroom-references/**",
-                                        "/api/v1/sensor-types/**")
-                                .uri(CULTIVATION_LB_URL))
+                                        "/api/v1/sensor-types/**",
+                                        "/api/v1/admin/mushroom-references/**",
+                                        "/api/v1/admin/sensor-types/**")
+                                .uri(upstreamProperties.cultivationUrl().toString()))
                 .route("notification-server",
                         p -> p.path(
                                         "/api/v1/notifications",
@@ -39,11 +42,11 @@ public class RouterLocateConfig {
                                         "/api/v1/notification-subscriptions/**",
                                         "/api/v1/notification-subscription-types",
                                         "/api/v1/notification-subscription-types/**")
-                                .uri(NOTIFICATION_LB_URL))
+                                .uri(upstreamProperties.notificationUrl().toString()))
                 .route("ai-server",
                         p -> p.path(
                                         "/api/mushrooms/**")
-                                .uri(AI_LB_URL))
+                                .uri(upstreamProperties.aiUrl().toString()))
                 .build();
     }
 }
