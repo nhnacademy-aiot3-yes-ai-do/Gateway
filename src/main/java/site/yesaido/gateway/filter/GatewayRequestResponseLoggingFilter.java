@@ -17,7 +17,7 @@ public class GatewayRequestResponseLoggingFilter implements GlobalFilter, Ordere
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, @NonNull GatewayFilterChain chain) {
         String method = String.valueOf(exchange.getRequest().getMethod());
-        String path = exchange.getRequest().getURI().getPath();
+        String path = exchange.getRequest().getURI().getRawPath();
 
         log.info("gateway_request method={} path={}", method, path);
 

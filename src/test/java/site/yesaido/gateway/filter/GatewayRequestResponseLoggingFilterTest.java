@@ -11,6 +11,8 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GatewayRequestResponseLoggingFilterTest {
@@ -42,6 +44,40 @@ class GatewayRequestResponseLoggingFilterTest {
                             "gateway_response method=GET path=/api/v1/cultivations/7 status=403"
                     )
                     .noneMatch(message -> message.contains("must-not-log"));
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    void logsEncodedNewlineInPathWithoutDecodingIt() {
+        GatewayRequestResponseLoggingFilter filter = new GatewayRequestResponseLoggingFilter();
+        Logger logger = (Logger) LoggerFactory.getLogger(GatewayRequestResponseLoggingFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            var initialExchange = MockServerWebExchange.from(
+                    MockServerHttpRequest.get("/api/v1/cultivations/7").build());
+            var exchange = initialExchange.mutate()
+                    .request(builder -> builder.uri(
+                            URI.create("http://localhost/api/v1/cultivations/7%0Aforged-log-line")))
+                    .build();
+
+            filter.filter(exchange, currentExchange -> {
+                currentExchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return Mono.empty();
+            }).block();
+
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .contains(
+                            "gateway_request method=GET path=/api/v1/cultivations/7%0Aforged-log-line",
+                            "gateway_response method=GET path=/api/v1/cultivations/7%0Aforged-log-line status=403"
+                    )
+                    .noneMatch(message -> message.contains("\n") || message.contains("\r"));
         } finally {
             logger.detachAppender(appender);
             appender.stop();
