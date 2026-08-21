@@ -35,6 +35,7 @@ gateway:
 logging:
   level:
     root: ${LOG_LEVEL:INFO}
+    site.yesaido.gateway.filter.GatewayRequestResponseLoggingFilter: INFO
 
 
 management:
