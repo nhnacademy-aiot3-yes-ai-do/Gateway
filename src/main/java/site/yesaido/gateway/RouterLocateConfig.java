@@ -19,10 +19,10 @@ public class RouterLocateConfig {
         return builder.routes()
                 .route("user-server",
                         p -> p.path(
-                                        "/api/users/**",
-                                        "/api/auth/**",
-                                        "/api/inquiries/**",
-                                        "/api/admin/inquiries/**")
+                                        "/api/v1/users/**",
+                                        "/api/v1/auth/**",
+                                        "/api/v1/inquiries/**",
+                                        "/api/v1/admin/inquiries/**")
                                 .uri(upstreamProperties.userUrl().toString()))
                 .route("cultivation-server",
                         p -> p.path(

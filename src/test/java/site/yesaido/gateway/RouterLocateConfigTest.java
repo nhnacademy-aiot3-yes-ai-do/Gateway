@@ -38,12 +38,12 @@ class RouterLocateConfigTest {
     }
 
     @Test
-    @DisplayName("user-server 라우트는 /api/users/**, /api/auth/** 경로를 매칭한다")
+    @DisplayName("user-server 라우트는 /api/v1/users/**, /api/v1/auth/** 경로를 매칭한다")
     void userServerRouteMatchesUsersAndAuthPaths() {
         Route route = findRoute("user-server");
 
-        assertThat(matches(route, "/api/users/check-email")).isTrue();
-        assertThat(matches(route, "/api/auth/login")).isTrue();
+        assertThat(matches(route, "/api/v1/users/check-email")).isTrue();
+        assertThat(matches(route, "/api/v1/auth/login")).isTrue();
     }
 
     @Test
@@ -51,7 +51,7 @@ class RouterLocateConfigTest {
     void userServerRouteDoesNotMatchOtherPaths() {
         Route route = findRoute("user-server");
 
-        assertThat(matches(route, "/api/cultivations")).isFalse();
+        assertThat(matches(route, "/api/v1/cultivations")).isFalse();
     }
 
     @Test
@@ -70,7 +70,7 @@ class RouterLocateConfigTest {
     void cultivationServerRouteDoesNotMatchOtherPaths() {
         Route route = findRoute("cultivation-server");
 
-        assertThat(matches(route, "/api/users/1")).isFalse();
+        assertThat(matches(route, "/api/v1/users/1")).isFalse();
     }
 
     @ParameterizedTest
@@ -105,7 +105,7 @@ class RouterLocateConfigTest {
     void notificationServerRouteDoesNotMatchOtherPaths() {
         Route route = findRoute("notification-server");
 
-        assertThat(matches(route, "/api/users/1")).isFalse();
+        assertThat(matches(route, "/api/v1/users/1")).isFalse();
         assertThat(matches(route, "/api/v1/cultivations/1")).isFalse();
     }
 }

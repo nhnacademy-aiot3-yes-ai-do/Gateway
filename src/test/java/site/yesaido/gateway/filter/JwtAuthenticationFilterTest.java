@@ -54,7 +54,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("공개 경로(로그인)는 토큰 없이도 통과")
     void publicPathBypassesAuthentication() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/api/auth/login").build());
+                MockServerHttpRequest.post("/api/v1/auth/login").build());
 
         filter.filter(exchange, chain).block();
 
@@ -66,7 +66,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("공개 경로(회원가입)는 토큰 없이도 통과")
     void publicSignupPathBypassesAuthentication() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/api/users/signup").build());
+                MockServerHttpRequest.post("/api/v1/users/signup").build());
 
         filter.filter(exchange, chain).block();
 
@@ -77,7 +77,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("공개 경로(이메일 인증 발송/검증)는 토큰 없이도 통과")
     void publicEmailAuthPathsBypassAuthentication() {
         ServerWebExchange sendExchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/api/auth/email/send").build());
+                MockServerHttpRequest.post("/api/v1/auth/email/send").build());
         filter.filter(sendExchange, chain).block();
         verify(chain).filter(sendExchange);
 
@@ -85,7 +85,7 @@ class JwtAuthenticationFilterTest {
         when(chain.filter(any())).thenReturn(Mono.empty());
 
         ServerWebExchange verifyExchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/api/auth/email/verify").build());
+                MockServerHttpRequest.post("/api/v1/auth/email/verify").build());
         filter.filter(verifyExchange, chain).block();
         verify(chain).filter(verifyExchange);
     }
@@ -94,7 +94,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("Authorization 헤더 없으면 401")
     void missingAuthorizationHeaderReturns401() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations").build());
+                MockServerHttpRequest.get("/api/v1/cultivations").build());
 
         filter.filter(exchange, chain).block();
 
@@ -106,7 +106,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("Bearer로 시작하지 않는 Authorization 헤더면 401")
     void nonBearerAuthorizationHeaderReturns401() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations")
+                MockServerHttpRequest.get("/api/v1/cultivations")
                         .header("Authorization", "Basic dXNlcjpwYXNz")
                         .build());
 
@@ -120,7 +120,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("유효한 JWT면 X-User-Id 헤더를 추가해서 다음 필터로 통과")
     void validTokenAddsUserIdHeaderAndProceeds() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations")
+                MockServerHttpRequest.get("/api/v1/cultivations")
                         .header("Authorization", "Bearer " + validToken("42"))
                         .build());
 
@@ -135,7 +135,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("만료된 JWT면 401")
     void expiredTokenReturns401() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations")
+                MockServerHttpRequest.get("/api/v1/cultivations")
                         .header("Authorization", "Bearer " + expiredToken("42"))
                         .build());
 
@@ -170,7 +170,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("클라이언트가 보낸 X-User-Id는 JWT 사용자 ID로 덮어쓴다")
     void clientUserIdHeaderIsReplacedWithJwtSubject() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/inquiries/1")
+                MockServerHttpRequest.get("/api/v1/inquiries/1")
                         .header("Authorization", "Bearer " + validToken("42"))
                         .header("X-User-Id", "999")
                         .build()
@@ -208,7 +208,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("role 클레임이 있는 JWT면 X-User-Role 헤더도 추가해서 통과")
     void validTokenWithRoleAddsUserRoleHeader() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin/inquiries")
+                MockServerHttpRequest.get("/api/v1/admin/inquiries")
                         .header("Authorization", "Bearer " + validTokenWithRole("42", "ADMIN"))
                         .build());
 
@@ -224,7 +224,7 @@ class JwtAuthenticationFilterTest {
     @DisplayName("role 클레임이 없으면 클라이언트가 보낸 X-User-Role 헤더도 제거한다")
     void clientSpoofedRoleHeaderIsStrippedWhenJwtHasNoRole() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations")
+                MockServerHttpRequest.get("/api/v1/cultivations")
                         .header("Authorization", "Bearer " + validToken("42"))
                         .header("X-User-Role", "ADMIN")
                         .build());

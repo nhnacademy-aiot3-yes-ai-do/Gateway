@@ -22,15 +22,15 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/login",
-            "/api/users/signup",
-            "/api/users/check-email",
-            "/api/users/check-nickname",
-            "/api/auth/email",
-            "/api/auth/dormant/release",
-            "/api/auth/reissue",
-            "/api/auth/oauth2",
-            "/api/auth/oauth2/google"
+            "/api/v1/auth/login",
+            "/api/v1/users/signup",
+            "/api/v1/users/check-email",
+            "/api/v1/users/check-nickname",
+            "/api/v1/auth/email",
+            "/api/v1/auth/dormant/release",
+            "/api/v1/auth/reissue",
+            "/api/v1/auth/oauth2",
+            "/api/v1/auth/oauth2/google"
     );
 
     private final Key key;
