@@ -45,9 +45,9 @@ public class RouterLocateConfig {
                                 .uri(upstreamProperties.notificationUrl().toString()))
                 .route("ai-server",
                         p -> p.path(
-                                        "/api/mushrooms/**",
-                                        "/api/ai/**",
-                                        "/api/admin/data")
+                                        "/api/v1/ai/**",
+                                        "/api/v1/mushrooms/**",
+                                        "/api/v1/admin/data")
                                 .uri(upstreamProperties.aiUrl().toString()))
                 .build();
     }
