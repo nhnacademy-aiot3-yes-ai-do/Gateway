@@ -30,7 +30,7 @@ class RoleAuthorizationFilterTest {
     @DisplayName("관리자 경로 + ADMIN role이면 통과")
     void adminPathWithAdminRolePasses() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin/inquiries")
+                MockServerHttpRequest.get("/api/v1/admin/inquiries")
                         .header("X-User-Role", "ADMIN")
                         .build());
 
@@ -44,7 +44,7 @@ class RoleAuthorizationFilterTest {
     @DisplayName("관리자 경로 + ADMIN이 아닌 role이면 403")
     void adminPathWithNonAdminRoleIsForbidden() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin/inquiries")
+                MockServerHttpRequest.get("/api/v1/admin/inquiries")
                         .header("X-User-Role", "USER")
                         .build());
 
@@ -58,7 +58,7 @@ class RoleAuthorizationFilterTest {
     @DisplayName("관리자 경로 + role 헤더 없으면 403")
     void adminPathWithoutRoleHeaderIsForbidden() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin/inquiries").build());
+                MockServerHttpRequest.get("/api/v1/admin/inquiries").build());
 
         filter.filter(exchange, chain).block();
 
@@ -84,7 +84,7 @@ class RoleAuthorizationFilterTest {
     @DisplayName("관리자 경로가 아니면 role과 무관하게 통과")
     void nonAdminPathBypassesRoleCheck() {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/cultivations").build());
+                MockServerHttpRequest.get("/api/v1/cultivations").build());
 
         filter.filter(exchange, chain).block();
 
