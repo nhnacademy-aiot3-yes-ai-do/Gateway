@@ -22,7 +22,8 @@ public class RouterLocateConfig {
                                         "/api/v1/users/**",
                                         "/api/v1/auth/**",
                                         "/api/v1/inquiries/**",
-                                        "/api/v1/admin/inquiries/**")
+                                        "/api/v1/admin/inquiries/**",
+                                        "/api/v1/admin/members/**")
                                 .uri(upstreamProperties.userUrl().toString()))
                 .route("cultivation-server",
                         p -> p.path(
