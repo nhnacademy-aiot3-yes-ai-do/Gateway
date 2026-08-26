@@ -64,6 +64,30 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("공개 leaf 경로의 접두사 확장은 JWT 없이 접근할 수 없다")
+    void publicLeafPathPrefixExtensionRequiresAuthentication() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/auth/loginX").build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("공개 하위 경로의 경계 밖 접두사는 JWT 없이 접근할 수 없다")
+    void publicChildPathPrefixExtensionRequiresAuthentication() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/auth/emailX").build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     @DisplayName("공개 경로(회원가입)는 토큰 없이도 통과")
     void publicSignupPathBypassesAuthentication() {
         ServerWebExchange exchange = MockServerWebExchange.from(
@@ -89,6 +113,53 @@ class JwtAuthenticationFilterTest {
                 MockServerHttpRequest.post("/api/v1/auth/email/verify").build());
         filter.filter(verifyExchange, chain).block();
         verify(chain).filter(verifyExchange);
+    }
+
+    @Test
+    @DisplayName("Telegram webhook 공개 경로는 JWT 없이도 다음 필터로 통과")
+    void telegramWebhookBypassesAuthenticationOnlyForExactPath() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/webhooks/telegram").build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain).filter(exchange);
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    @DisplayName("Telegram webhook GET 요청은 JWT 없이 접근할 수 없다")
+    void telegramWebhookGetRequiresAuthentication() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/webhooks/telegram").build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Telegram webhook 하위 경로와 이전 내부 경로는 JWT 없이 접근할 수 없다")
+    void telegramWebhookNonPublicPathsRequireAuthentication() {
+        ServerWebExchange subpathExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/webhooks/telegram/extra").build());
+
+        filter.filter(subpathExchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(subpathExchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        reset(chain);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        ServerWebExchange legacyExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/internal/telegram/webhook").build());
+
+        filter.filter(legacyExchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(legacyExchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

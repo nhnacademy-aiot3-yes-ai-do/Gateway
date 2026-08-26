@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
@@ -32,8 +33,12 @@ class RouterLocateConfigTest {
     }
 
     private boolean matches(Route route, String path) {
+        return matches(route, HttpMethod.GET, path);
+    }
+
+    private boolean matches(Route route, HttpMethod method, String path) {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get(path).build());
+                MockServerHttpRequest.method(method, path).build());
         return Boolean.TRUE.equals(Mono.from(route.getPredicate().apply(exchange)).block());
     }
 
@@ -98,6 +103,17 @@ class RouterLocateConfigTest {
         assertThat(matches(route, "/api/v1/notification-endpoints")).isTrue();
         assertThat(matches(route, "/api/v1/notification-subscriptions/1/enabled")).isTrue();
         assertThat(matches(route, "/api/v1/notification-subscription-types")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Telegram webhook route는 정확한 POST 요청만 Notification Server로 라우팅한다")
+    void telegramWebhookRouteMatchesOnlyExactPostPath() {
+        Route route = findRoute("telegram-webhook");
+
+        assertThat(matches(route, HttpMethod.POST, "/webhooks/telegram")).isTrue();
+        assertThat(matches(route, HttpMethod.GET, "/webhooks/telegram")).isFalse();
+        assertThat(matches(route, HttpMethod.POST, "/webhooks/telegram/extra")).isFalse();
+        assertThat(matches(route, HttpMethod.POST, "/internal/telegram/webhook")).isFalse();
     }
 
     @Test

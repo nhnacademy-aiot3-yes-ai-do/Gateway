@@ -11,6 +11,7 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -22,16 +23,18 @@ import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
-    private static final List<String> PUBLIC_PATHS = List.of(
+    private static final String TELEGRAM_WEBHOOK_PATH = "/webhooks/telegram";
+    private static final List<String> PUBLIC_EXACT_PATHS = List.of(
             "/api/v1/auth/login",
             "/api/v1/users/signup",
             "/api/v1/users/check-email",
             "/api/v1/users/check-nickname",
-            "/api/v1/auth/email",
             "/api/v1/auth/dormant/release",
-            "/api/v1/auth/reissue",
-            "/api/v1/auth/oauth2",
-            "/api/v1/auth/oauth2/google"
+            "/api/v1/auth/reissue"
+    );
+    private static final List<String> PUBLIC_PATH_PREFIXES = List.of(
+            "/api/v1/auth/email",
+            "/api/v1/auth/oauth2"
     );
 
     private final Key key;
@@ -40,10 +43,18 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    private boolean isPublicPath(String path) {
+        return PUBLIC_EXACT_PATHS.contains(path)
+                || PUBLIC_PATH_PREFIXES.stream()
+                .anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"));
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, @NonNull GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+        if (isPublicPath(path)
+                || (TELEGRAM_WEBHOOK_PATH.equals(path)
+                && HttpMethod.POST.equals(exchange.getRequest().getMethod()))) {
             return chain.filter(exchange);
         }
 
