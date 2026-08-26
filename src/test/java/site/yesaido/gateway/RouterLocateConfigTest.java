@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
@@ -32,18 +33,25 @@ class RouterLocateConfigTest {
     }
 
     private boolean matches(Route route, String path) {
+        return matches(route, HttpMethod.GET, path);
+    }
+
+    private boolean matches(Route route, HttpMethod method, String path) {
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get(path).build());
+                MockServerHttpRequest.method(method, path).build());
         return Boolean.TRUE.equals(Mono.from(route.getPredicate().apply(exchange)).block());
     }
 
     @Test
-    @DisplayName("user-server 라우트는 /api/v1/users/**, /api/v1/auth/** 경로를 매칭한다")
+    @DisplayName("user-server 라우트는 /api/v1/users/**, /api/v1/auth/**, /api/v1/inquiries/** 경로를 매칭한다")
     void userServerRouteMatchesUsersAndAuthPaths() {
         Route route = findRoute("user-server");
 
         assertThat(matches(route, "/api/v1/users/check-email")).isTrue();
         assertThat(matches(route, "/api/v1/auth/login")).isTrue();
+        assertThat(matches(route, "/api/v1/inquiries")).isTrue();
+        assertThat(matches(route, "/api/v1/admin/inquiries")).isTrue();
+        assertThat(matches(route, "/api/v1/admin/members")).isTrue();
     }
 
     @Test
@@ -60,6 +68,8 @@ class RouterLocateConfigTest {
         Route route = findRoute("cultivation-server");
 
         assertThat(matches(route, "/api/v1/cultivations/1")).isTrue();
+        assertThat(matches(route, "/api/v1/mushroom-references")).isTrue();
+        assertThat(matches(route, "/api/v1/sensor-types")).isTrue();
         assertThat(matches(route, "/api/v1/admin/mushroom-references")).isTrue();
         assertThat(matches(route, "/api/v1/admin/sensor-types")).isTrue();
         assertThat(matches(route, "/api/cultivations/1")).isFalse();
@@ -101,11 +111,42 @@ class RouterLocateConfigTest {
     }
 
     @Test
+    @DisplayName("Telegram webhook route는 정확한 POST 요청만 Notification Server로 라우팅한다")
+    void telegramWebhookRouteMatchesOnlyExactPostPath() {
+        Route route = findRoute("telegram-webhook");
+
+        assertThat(matches(route, HttpMethod.POST, "/webhooks/telegram")).isTrue();
+        assertThat(matches(route, HttpMethod.GET, "/webhooks/telegram")).isFalse();
+        assertThat(matches(route, HttpMethod.POST, "/webhooks/telegram/extra")).isFalse();
+        assertThat(matches(route, HttpMethod.POST, "/internal/telegram/webhook")).isFalse();
+    }
+
+    @Test
     @DisplayName("notification-server 라우트는 다른 경로를 매칭하지 않는다")
     void notificationServerRouteDoesNotMatchOtherPaths() {
         Route route = findRoute("notification-server");
 
         assertThat(matches(route, "/api/v1/users/1")).isFalse();
         assertThat(matches(route, "/api/v1/cultivations/1")).isFalse();
+    }
+
+    @Test
+    @DisplayName("ai-server 라우트는 AI 및 버섯 가이드, 관리자 데이터 API 경로를 매칭한다")
+    void aiServerRouteMatchesAiAndMushroomPaths() {
+        Route route = findRoute("ai-server");
+
+        assertThat(matches(route, "/api/v1/ai/sensor/validate")).isTrue();
+        assertThat(matches(route, "/api/v1/mushrooms/1/guide")).isTrue();
+        assertThat(matches(route, "/api/v1/admin/data")).isTrue();
+    }
+
+    @Test
+    @DisplayName("ai-server 라우트는 다른 서비스의 경로를 매칭하지 않는다")
+    void aiServerRouteDoesNotMatchOtherPaths() {
+        Route route = findRoute("ai-server");
+
+        assertThat(matches(route, "/api/v1/users/1")).isFalse();
+        assertThat(matches(route, "/api/v1/cultivations/1")).isFalse();
+        assertThat(matches(route, "/api/v1/notifications")).isFalse();
     }
 }

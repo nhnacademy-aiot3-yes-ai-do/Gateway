@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -43,6 +44,10 @@ public class RouterLocateConfig {
                                         "/api/v1/notification-subscriptions/**",
                                         "/api/v1/notification-subscription-types",
                                         "/api/v1/notification-subscription-types/**")
+                                .uri(upstreamProperties.notificationUrl().toString()))
+                .route("telegram-webhook",
+                        p -> p.path("/webhooks/telegram")
+                                .and().method(HttpMethod.POST)
                                 .uri(upstreamProperties.notificationUrl().toString()))
                 .route("ai-server",
                         p -> p.path(
