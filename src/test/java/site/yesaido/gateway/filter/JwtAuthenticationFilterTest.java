@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
@@ -234,5 +235,27 @@ class JwtAuthenticationFilterTest {
         ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
         verify(chain).filter(captor.capture());
         assertThat(captor.getValue().getRequest().getHeaders().get("X-User-Role")).isNull();
+    }
+    @Test
+    @DisplayName("accessToken 쿠키의 유효한 JWT면 X-User-Id 헤더를 추가해서 다음 필터로 통과")
+    void validAccessTokenCookieAddsUserIdHeaderAndProceeds() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/cultivations")
+                        .cookie(new HttpCookie("accessToken", validToken("42")))
+                        .build()
+        );
+
+        filter.filter(exchange, chain).block();
+
+        ArgumentCaptor<ServerWebExchange> captor =
+                ArgumentCaptor.forClass(ServerWebExchange.class);
+
+        verify(chain).filter(captor.capture());
+
+        assertThat(captor.getValue()
+                .getRequest()
+                .getHeaders()
+                .getFirst("X-User-Id"))
+                .isEqualTo("42");
     }
 }
