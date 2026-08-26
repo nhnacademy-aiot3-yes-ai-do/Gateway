@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -46,14 +47,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String accessToken = resolveAccessToken(exchange.getRequest());
+        if(accessToken == null || accessToken.isBlank()){
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         try {
-            Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authHeader.substring(7)).getBody();
+            Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken).getBody();
             String role = claims.get("role", String.class);
 
             ServerHttpRequest.Builder mutatedBuilder = exchange.getRequest().mutate();
@@ -71,6 +72,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
+    }
+
+    // AccessToken 추출
+    private String resolveAccessToken(ServerHttpRequest request){
+        String authorization = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
+        if(authorization != null && authorization.startsWith("Bearer ")){
+            return authorization.substring(7);
+        }
+
+        HttpCookie accessTokenCookie = request.getCookies().getFirst("accessToken");
+
+        return accessTokenCookie != null ? accessTokenCookie.getValue() : null;
     }
 
     // -2: 인증 . -1: 인가 -> 인증 필터 후 인가 필터
