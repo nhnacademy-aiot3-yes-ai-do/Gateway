@@ -43,7 +43,9 @@ public class RouterLocateConfig {
                                         "/api/v1/notification-subscriptions",
                                         "/api/v1/notification-subscriptions/**",
                                         "/api/v1/notification-subscription-types",
-                                        "/api/v1/notification-subscription-types/**")
+                                        "/api/v1/notification-subscription-types/**",
+                                        "/api/v1/telegram-link-sessions",
+                                        "/api/v1/telegram-link-sessions/**")
                                 .uri(upstreamProperties.notificationUrl().toString()))
                 .route("telegram-webhook",
                         p -> p.path("/webhooks/telegram")
