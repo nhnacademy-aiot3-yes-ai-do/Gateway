@@ -108,6 +108,9 @@ class RouterLocateConfigTest {
         assertThat(matches(route, "/api/v1/notification-endpoints")).isTrue();
         assertThat(matches(route, "/api/v1/notification-subscriptions/1/enabled")).isTrue();
         assertThat(matches(route, "/api/v1/notification-subscription-types")).isTrue();
+        assertThat(matches(route, HttpMethod.POST, "/api/v1/telegram-link-sessions")).isTrue();
+        assertThat(matches(route, HttpMethod.GET, "/api/v1/telegram-link-sessions/0d9cce63-4fcf-4c45-aa8a-f6a0adcf7d79"))
+                .isTrue();
     }
 
     @Test
