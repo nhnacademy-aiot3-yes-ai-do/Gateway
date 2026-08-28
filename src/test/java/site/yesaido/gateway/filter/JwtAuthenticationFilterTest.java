@@ -14,6 +14,7 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import site.yesaido.gateway.service.AccessTokenBlacklistService;
 
 import java.util.Date;
 
@@ -27,17 +28,26 @@ class JwtAuthenticationFilterTest {
 
     private JwtAuthenticationFilter filter;
     private GatewayFilterChain chain;
+    private AccessTokenBlacklistService accessTokenBlacklistService;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(SECRET);
+        accessTokenBlacklistService = mock(AccessTokenBlacklistService.class);
+        when(accessTokenBlacklistService.isBlacklisted(anyString())).thenReturn(Mono.just(false));
+        filter = new JwtAuthenticationFilter(SECRET, accessTokenBlacklistService);
         chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());
     }
 
     private String validToken(String subject) {
+        return validToken(subject, "token-id-" + subject);
+    }
+
+    private String validToken(String subject, String tokenId) {
         return Jwts.builder()
+                .setId(tokenId)
                 .setSubject(subject)
+                .claim("tokenType", "ACCESS")
                 .setExpiration(new Date(System.currentTimeMillis() + 60_000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
@@ -45,7 +55,9 @@ class JwtAuthenticationFilterTest {
 
     private String expiredToken(String subject) {
         return Jwts.builder()
+                .setId("expired-token-id")
                 .setSubject(subject)
+                .claim("tokenType", "ACCESS")
                 .setExpiration(new Date(System.currentTimeMillis() - 60_000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
@@ -201,6 +213,59 @@ class JwtAuthenticationFilterTest {
         ArgumentCaptor<ServerWebExchange> captor = ArgumentCaptor.forClass(ServerWebExchange.class);
         verify(chain).filter(captor.capture());
         assertThat(captor.getValue().getRequest().getHeaders().getFirst("X-User-Id")).isEqualTo("42");
+        verify(accessTokenBlacklistService).isBlacklisted("token-id-42");
+    }
+
+    @Test
+    @DisplayName("블랙리스트에 등록된 Access Token은 401로 차단한다")
+    void blacklistedTokenReturnsUnauthorized() {
+        when(accessTokenBlacklistService.isBlacklisted("blocked-token-id")).thenReturn(Mono.just(true));
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/cultivations")
+                        .header("Authorization", "Bearer " + validToken("42", "blocked-token-id"))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("ACCESS 타입 또는 jti가 없는 JWT는 인증에 사용할 수 없다")
+    void tokenWithoutAccessTypeOrTokenIdReturnsUnauthorized() {
+        String tokenWithoutAccessType = Jwts.builder()
+                .setId("token-id")
+                .setSubject("42")
+                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/cultivations")
+                        .header("Authorization", "Bearer " + tokenWithoutAccessType)
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain, never()).filter(any());
+        verify(accessTokenBlacklistService, never()).isBlacklisted(anyString());
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        String tokenWithoutTokenId = Jwts.builder()
+                .setSubject("42")
+                .claim("tokenType", "ACCESS")
+                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+        ServerWebExchange noTokenIdExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/cultivations")
+                        .header("Authorization", "Bearer " + tokenWithoutTokenId)
+                        .build());
+
+        filter.filter(noTokenIdExchange, chain).block();
+
+        assertThat(noTokenIdExchange.getResponse().getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
@@ -269,8 +334,10 @@ class JwtAuthenticationFilterTest {
 
     private String validTokenWithRole(String subject, String role) {
         return Jwts.builder()
+                .setId("role-token-id-" + subject)
                 .setSubject(subject)
                 .claim("role", role)
+                .claim("tokenType", "ACCESS")
                 .setExpiration(new Date(System.currentTimeMillis() + 60_000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
@@ -328,5 +395,19 @@ class JwtAuthenticationFilterTest {
                 .getHeaders()
                 .getFirst("X-User-Id"))
                 .isEqualTo("42");
+    }
+
+    @Test
+    @DisplayName("로그아웃 경로는 Access Token 없이도 Auth 서버로 통과한다")
+    void logoutPathBypassesAuthentication() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/auth/logout").build()
+        );
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain).filter(any(ServerWebExchange.class));
+        verify(accessTokenBlacklistService, never()).isBlacklisted(anyString());
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 }
