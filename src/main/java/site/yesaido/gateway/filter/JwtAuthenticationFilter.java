@@ -80,7 +80,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
             return accessTokenBlacklistService.isBlacklisted(tokenId)
                     .flatMap(isBlacklisted -> {
-                        if(isBlacklisted){
+                        if(Boolean.TRUE.equals(isBlacklisted)){
                             return unauthorized(exchange);
                         }
                         return forwardAuthenticatedRequest(exchange, chain, claims);
