@@ -111,6 +111,17 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("공개 경로(회원가입 이메일 인증 확인)는 토큰 없이도 통과")
+    void publicSignupEmailVerificationPathBypassesAuthentication() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/users/signup/verify-email").build());
+
+        filter.filter(exchange, chain).block();
+
+        verify(chain).filter(any(ServerWebExchange.class));
+    }
+
+    @Test
     @DisplayName("공개 경로(이메일 인증 발송/검증)는 토큰 없이도 통과")
     void publicEmailAuthPathsBypassAuthentication() {
         ServerWebExchange sendExchange = MockServerWebExchange.from(
