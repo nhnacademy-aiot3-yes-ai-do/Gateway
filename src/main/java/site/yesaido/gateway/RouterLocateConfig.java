@@ -44,6 +44,12 @@ public class RouterLocateConfig {
                                         "/api/v1/notification-subscriptions/**",
                                         "/api/v1/notification-subscription-types",
                                         "/api/v1/notification-subscription-types/**",
+                                        "/api/v1/admin/notification-event-types",
+                                        "/api/v1/admin/notification-event-types/**",
+                                        "/api/v1/admin/notification-templates",
+                                        "/api/v1/admin/notification-templates/**",
+                                        "/api/v1/admin/channel-types",
+                                        "/api/v1/admin/channel-types/**",
                                         "/api/v1/telegram-link-sessions",
                                         "/api/v1/telegram-link-sessions/**")
                                 .uri(upstreamProperties.notificationUrl().toString()))
