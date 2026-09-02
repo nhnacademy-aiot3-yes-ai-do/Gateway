@@ -33,7 +33,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/users/check-nickname",
             "/api/v1/auth/dormant/release",
             "/api/v1/auth/reissue",
-            "/api/v1/auth/password/reset"
+            "/api/v1/auth/password/reset",
+            "/api/v1/auth/password-reset/email/send"
     );
     private static final List<String> PUBLIC_PATH_PREFIXES = List.of(
             "/api/v1/auth/email",
