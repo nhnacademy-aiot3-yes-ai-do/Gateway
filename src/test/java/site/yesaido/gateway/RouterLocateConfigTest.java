@@ -69,6 +69,7 @@ class RouterLocateConfigTest {
 
         assertThat(matches(route, "/api/v1/cultivations/1")).isTrue();
         assertThat(matches(route, "/api/v1/mushroom-references")).isTrue();
+        assertThat(matches(route, "/api/v1/sensors/reusable")).isTrue();
         assertThat(matches(route, "/api/v1/sensor-types")).isTrue();
         assertThat(matches(route, "/api/v1/admin/mushroom-references")).isTrue();
         assertThat(matches(route, "/api/v1/admin/sensor-types")).isTrue();

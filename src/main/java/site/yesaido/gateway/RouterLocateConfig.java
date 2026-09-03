@@ -30,6 +30,7 @@ public class RouterLocateConfig {
                         p -> p.path(
                                         "/api/v1/cultivations/**",
                                         "/api/v1/mushroom-references/**",
+                                        "/api/v1/sensors/**",
                                         "/api/v1/sensor-types/**",
                                         "/api/v1/admin/mushroom-references/**",
                                         "/api/v1/admin/sensor-types/**")
