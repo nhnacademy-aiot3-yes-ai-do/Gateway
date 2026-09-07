@@ -120,6 +120,18 @@ class RouterLocateConfigTest {
         assertThat(route.getUri().getPort()).isEqualTo(8000);
     }
 
+    @Test
+    @DisplayName("notification-api-docs 라우트는 /v3/api-docs/notification 만 notification-server로 프록시한다")
+    void notificationApiDocsRouteMatchesOnlyItsExactPath() {
+        Route route = findRoute("notification-api-docs");
+
+        assertThat(matches(route, "/v3/api-docs/notification")).isTrue();
+        assertThat(matches(route, "/v3/api-docs")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/swagger-config")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/ai")).isFalse();
+        assertThat(route.getUri().getPort()).isEqualTo(8085);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "user-server, 8081",

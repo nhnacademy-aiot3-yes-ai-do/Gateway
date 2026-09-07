@@ -55,6 +55,8 @@ springdoc:
         url: /v3/api-docs/cultivation
       - name: ai-server
         url: /v3/api-docs/ai
+      - name: notification-server
+        url: /v3/api-docs/notification
 
 logging:
   level:

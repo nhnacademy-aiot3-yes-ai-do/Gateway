@@ -78,6 +78,10 @@ public class RouterLocateConfig {
                         p -> p.path("/v3/api-docs/ai")
                                 .filters(f -> f.rewritePath("/v3/api-docs/ai", "/v3/api-docs"))
                                 .uri(upstreamProperties.aiUrl().toString()))
+                .route("notification-api-docs",
+                        p -> p.path("/v3/api-docs/notification")
+                                .filters(f -> f.rewritePath("/v3/api-docs/notification", "/v3/api-docs"))
+                                .uri(upstreamProperties.notificationUrl().toString()))
                 .build();
     }
 }
