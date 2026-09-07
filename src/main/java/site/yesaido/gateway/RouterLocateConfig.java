@@ -66,10 +66,18 @@ public class RouterLocateConfig {
                                 .uri(upstreamProperties.aiUrl().toString()))
                 // API 문서: Swagger UI 자체는 Gateway가 로컬로 서빙하고,
                 // 각 서비스의 OpenAPI 스펙만 아래 라우트로 프록시한다.
+                .route("user-api-docs",
+                        p -> p.path("/v3/api-docs/user")
+                                .filters(f -> f.rewritePath("/v3/api-docs/user", "/v3/api-docs"))
+                                .uri(upstreamProperties.userUrl().toString()))
                 .route("cultivation-api-docs",
                         p -> p.path("/v3/api-docs/cultivation")
                                 .filters(f -> f.rewritePath("/v3/api-docs/cultivation", "/v3/api-docs"))
                                 .uri(upstreamProperties.cultivationUrl().toString()))
+                .route("ai-api-docs",
+                        p -> p.path("/v3/api-docs/ai")
+                                .filters(f -> f.rewritePath("/v3/api-docs/ai", "/v3/api-docs"))
+                                .uri(upstreamProperties.aiUrl().toString()))
                 .build();
     }
 }
