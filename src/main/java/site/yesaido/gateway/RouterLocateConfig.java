@@ -1,8 +1,12 @@
 package site.yesaido.gateway;
 
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.Buildable;
+import org.springframework.cloud.gateway.route.builder.PredicateSpec;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +16,9 @@ import org.springframework.http.HttpMethod;
 @Configuration
 @EnableConfigurationProperties(GatewayUpstreamProperties.class)
 public class RouterLocateConfig {
+
+    /** 각 서비스가 springdoc으로 OpenAPI 스펙을 노출하는 경로. */
+    private static final String API_DOCS_PATH = "/v3/api-docs";
 
     private final GatewayUpstreamProperties upstreamProperties;
 
@@ -65,23 +72,21 @@ public class RouterLocateConfig {
                                         "/api/v1/admin/data")
                                 .uri(upstreamProperties.aiUrl().toString()))
                 // API 문서: Swagger UI 자체는 Gateway가 로컬로 서빙하고,
-                // 각 서비스의 OpenAPI 스펙만 아래 라우트로 프록시한다.
-                .route("user-api-docs",
-                        p -> p.path("/v3/api-docs/user")
-                                .filters(f -> f.rewritePath("/v3/api-docs/user", "/v3/api-docs"))
-                                .uri(upstreamProperties.userUrl().toString()))
-                .route("cultivation-api-docs",
-                        p -> p.path("/v3/api-docs/cultivation")
-                                .filters(f -> f.rewritePath("/v3/api-docs/cultivation", "/v3/api-docs"))
-                                .uri(upstreamProperties.cultivationUrl().toString()))
-                .route("ai-api-docs",
-                        p -> p.path("/v3/api-docs/ai")
-                                .filters(f -> f.rewritePath("/v3/api-docs/ai", "/v3/api-docs"))
-                                .uri(upstreamProperties.aiUrl().toString()))
-                .route("notification-api-docs",
-                        p -> p.path("/v3/api-docs/notification")
-                                .filters(f -> f.rewritePath("/v3/api-docs/notification", "/v3/api-docs"))
-                                .uri(upstreamProperties.notificationUrl().toString()))
+                // 각 서비스의 OpenAPI 스펙만 <API_DOCS_PATH>/<service> -> 서비스의 <API_DOCS_PATH> 로 프록시한다.
+                .route("user-api-docs", apiDocsRoute("user", upstreamProperties.userUrl().toString()))
+                .route("cultivation-api-docs", apiDocsRoute("cultivation", upstreamProperties.cultivationUrl().toString()))
+                .route("ai-api-docs", apiDocsRoute("ai", upstreamProperties.aiUrl().toString()))
+                .route("notification-api-docs", apiDocsRoute("notification", upstreamProperties.notificationUrl().toString()))
                 .build();
+    }
+
+    /**
+     * {@code <API_DOCS_PATH>/<service>} 요청을 해당 서비스의 {@code <API_DOCS_PATH>} 로 프록시하는 라우트를 만든다.
+     */
+    private Function<PredicateSpec, Buildable<Route>> apiDocsRoute(String service, String upstreamUri) {
+        String externalPath = API_DOCS_PATH + "/" + service;
+        return p -> p.path(externalPath)
+                .filters(f -> f.rewritePath(externalPath, API_DOCS_PATH))
+                .uri(upstreamUri);
     }
 }
