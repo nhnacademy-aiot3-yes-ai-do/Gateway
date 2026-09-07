@@ -84,6 +84,18 @@ class RouterLocateConfigTest {
         assertThat(matches(route, "/api/v1/users/1")).isFalse();
     }
 
+    @Test
+    @DisplayName("cultivation-api-docs 라우트는 /v3/api-docs/cultivation 만 cultivation-server로 프록시한다")
+    void cultivationApiDocsRouteMatchesOnlyItsExactPath() {
+        Route route = findRoute("cultivation-api-docs");
+
+        assertThat(matches(route, "/v3/api-docs/cultivation")).isTrue();
+        assertThat(matches(route, "/v3/api-docs")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/swagger-config")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/user")).isFalse();
+        assertThat(route.getUri().getPort()).isEqualTo(8084);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "user-server, 8081",
