@@ -11,6 +11,7 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RequiredArgsConstructor
 @Configuration
@@ -84,7 +85,10 @@ public class RouterLocateConfig {
      * {@code <API_DOCS_PATH>/<service>} 요청을 해당 서비스의 {@code <API_DOCS_PATH>} 로 프록시하는 라우트를 만든다.
      */
     private Function<PredicateSpec, Buildable<Route>> apiDocsRoute(String service, String upstreamUri) {
-        String externalPath = API_DOCS_PATH + "/" + service;
+        String externalPath = UriComponentsBuilder.fromPath(API_DOCS_PATH)
+                .pathSegment(service)
+                .build()
+                .getPath();
         return p -> p.path(externalPath)
                 .filters(f -> f.rewritePath(externalPath, API_DOCS_PATH))
                 .uri(upstreamUri);
