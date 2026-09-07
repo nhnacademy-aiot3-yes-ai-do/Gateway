@@ -139,6 +139,26 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("API 문서 경로(Swagger UI / OpenAPI 스펙)는 토큰 없이도 통과")
+    void swaggerAndApiDocsPathsBypassAuthentication() {
+        for (String path : java.util.List.of(
+                "/swagger-ui.html",
+                "/swagger-ui/index.html",
+                "/v3/api-docs/swagger-config",
+                "/v3/api-docs/cultivation")) {
+            reset(chain);
+            when(chain.filter(any())).thenReturn(Mono.empty());
+
+            ServerWebExchange exchange = MockServerWebExchange.from(
+                    MockServerHttpRequest.get(path).build());
+            filter.filter(exchange, chain).block();
+
+            verify(chain).filter(exchange);
+            assertThat(exchange.getResponse().getStatusCode()).isNull();
+        }
+    }
+
+    @Test
     @DisplayName("Telegram webhook 공개 경로는 JWT 없이도 다음 필터로 통과")
     void telegramWebhookBypassesAuthenticationOnlyForExactPath() {
         ServerWebExchange exchange = MockServerWebExchange.from(
