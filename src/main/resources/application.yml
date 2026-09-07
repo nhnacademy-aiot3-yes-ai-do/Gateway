@@ -38,6 +38,20 @@ gateway:
     notification-url: ${NOTIFICATION_SERVER_URL}
     ai-url: ${AI_SERVER_URL}
 
+# API 문서 통합 (springdoc). 각 서비스의 /v3/api-docs 를 Gateway 라우트로 프록시해
+# 하나의 Swagger UI(드롭다운)에서 조회한다. 서비스가 늘면 라우트 + urls 항목을 함께 추가한다.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    urls:
+      - name: cultivation-server
+        url: /v3/api-docs/cultivation
+
 logging:
   level:
     root: ${LOG_LEVEL:INFO}

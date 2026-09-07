@@ -34,11 +34,15 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/dormant/release",
             "/api/v1/auth/reissue",
             "/api/v1/auth/password/reset",
-            "/api/v1/auth/password-reset/email/send"
+            "/api/v1/auth/password-reset/email/send",
+            "/swagger-ui.html"
     );
     private static final List<String> PUBLIC_PATH_PREFIXES = List.of(
             "/api/v1/auth/email",
-            "/api/v1/auth/oauth2"
+            "/api/v1/auth/oauth2",
+            "/swagger-ui",
+            "/v3/api-docs",
+            "/webjars"
     );
 
     private final Key key;
