@@ -96,6 +96,42 @@ class RouterLocateConfigTest {
         assertThat(route.getUri().getPort()).isEqualTo(8084);
     }
 
+    @Test
+    @DisplayName("user-api-docs 라우트는 /v3/api-docs/user 만 user-server로 프록시한다")
+    void userApiDocsRouteMatchesOnlyItsExactPath() {
+        Route route = findRoute("user-api-docs");
+
+        assertThat(matches(route, "/v3/api-docs/user")).isTrue();
+        assertThat(matches(route, "/v3/api-docs")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/swagger-config")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/cultivation")).isFalse();
+        assertThat(route.getUri().getPort()).isEqualTo(8081);
+    }
+
+    @Test
+    @DisplayName("ai-api-docs 라우트는 /v3/api-docs/ai 만 ai-server로 프록시한다")
+    void aiApiDocsRouteMatchesOnlyItsExactPath() {
+        Route route = findRoute("ai-api-docs");
+
+        assertThat(matches(route, "/v3/api-docs/ai")).isTrue();
+        assertThat(matches(route, "/v3/api-docs")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/swagger-config")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/user")).isFalse();
+        assertThat(route.getUri().getPort()).isEqualTo(8000);
+    }
+
+    @Test
+    @DisplayName("notification-api-docs 라우트는 /v3/api-docs/notification 만 notification-server로 프록시한다")
+    void notificationApiDocsRouteMatchesOnlyItsExactPath() {
+        Route route = findRoute("notification-api-docs");
+
+        assertThat(matches(route, "/v3/api-docs/notification")).isTrue();
+        assertThat(matches(route, "/v3/api-docs")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/swagger-config")).isFalse();
+        assertThat(matches(route, "/v3/api-docs/ai")).isFalse();
+        assertThat(route.getUri().getPort()).isEqualTo(8085);
+    }
+
     @ParameterizedTest
     @CsvSource({
             "user-server, 8081",
